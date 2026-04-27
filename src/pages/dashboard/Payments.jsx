@@ -17,6 +17,7 @@ function loadRazorpayScript() {
     return Promise.resolve(true)
   }
 
+  // Load checkout lazily so the dashboard still works without Razorpay configured.
   return new Promise((resolve) => {
     const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'

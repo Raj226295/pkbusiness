@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser)
   const [loading, setLoading] = useState(Boolean(localStorage.getItem('ca_token')))
 
+  // Keep localStorage and in-memory auth state in sync for protected routes.
   const persistSession = (nextToken, nextUser) => {
     setToken(nextToken)
     setUser(nextUser)
