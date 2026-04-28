@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { siteContact } from '../../data/siteData.js'
 import api, { extractApiError } from '../../lib/api.js'
 
 const initialForm = {
@@ -82,7 +83,7 @@ function Contact() {
         <div className="contact-stack">
           <article className="panel">
             <h3>Visit our office</h3>
-            <p>3rd Floor, Civil Lines, New Delhi, India</p>
+            <p>{siteContact.address}</p>
             <p>Mon - Sat | 10:00 AM to 7:00 PM</p>
             <a className="text-link" href="mailto:hello@svca.in">
               hello@svca.in
@@ -94,7 +95,7 @@ function Contact() {
               allowFullScreen=""
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              src="https://www.google.com/maps?q=Connaught%20Place%2C%20New%20Delhi&z=13&output=embed"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(siteContact.mapQuery)}&z=15&output=embed`}
               title="Office map"
             />
           </article>

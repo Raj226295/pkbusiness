@@ -121,6 +121,11 @@ function Documents() {
                     <p>
                       {document.serviceType} | Uploaded {formatDate(document.createdAt)}
                     </p>
+                    <small>
+                      {document.uploadedBy?.role === 'admin'
+                        ? `Shared by ${document.uploadedBy.name}`
+                        : 'Uploaded by you'}
+                    </small>
                     {document.remarks ? <small>Remarks: {document.remarks}</small> : null}
                     {document.fileUrl ? (
                       <a className="text-link" href={document.fileUrl} rel="noreferrer" target="_blank">

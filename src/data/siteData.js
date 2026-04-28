@@ -1,3 +1,14 @@
+export const siteBrand = {
+  name: 'P.K BUSINESS',
+  shortName: 'PK',
+  tagline: 'Tax, Compliance & Business Services',
+}
+
+export const siteContact = {
+  address: 'Zero Mile, near Hanuman Mandir, Gulabbagh, Purnia, Bihar 854326',
+  mapQuery: 'Zero Mile, near Hanuman Mandir, Gulabbagh, Purnia, Bihar 854326',
+}
+
 export const publicNavLinks = [
   { label: 'Home', to: '/' },
   { label: 'About', to: '/about' },

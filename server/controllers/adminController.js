@@ -65,7 +65,10 @@ export const deleteUser = asyncHandler(async (req, res) => {
 })
 
 export const getAllDocuments = asyncHandler(async (_req, res) => {
-  const documents = await Document.find().populate('user', 'name email').sort({ createdAt: -1 })
+  const documents = await Document.find()
+    .populate('user', 'name email')
+    .populate('uploadedBy', 'name email role')
+    .sort({ createdAt: -1 })
   res.json({ documents })
 })
 
@@ -85,6 +88,10 @@ export const reviewDocument = asyncHandler(async (req, res) => {
     userId: document.user,
     title: 'Document review updated',
     message: `${document.title} is now marked as ${document.status}.`,
+    category: 'document',
+    link: '/dashboard/documents',
+    fileUrl: document.fileUrl,
+    actionLabel: 'Open document',
   })
 
   res.json({ message: 'Document reviewed successfully', document })

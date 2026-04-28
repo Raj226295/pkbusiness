@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { adminLinks, dashboardLinks } from '../../data/siteData.js'
+import { adminLinks, dashboardLinks, siteBrand } from '../../data/siteData.js'
 
 function Sidebar({ role = 'user' }) {
   const { user, logout } = useAuth()
@@ -15,10 +15,11 @@ function Sidebar({ role = 'user' }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-mark">SV</span>
+        <span className="brand-mark">{siteBrand.shortName}</span>
         <div>
-          <strong>{role === 'admin' ? 'Admin Workspace' : 'Client Portal'}</strong>
-          <small>{user?.name}</small>
+          <strong>{siteBrand.name}</strong>
+          <small>{role === 'admin' ? 'Admin Workspace' : 'Client Portal'}</small>
+          {user?.name ? <small>{user.name}</small> : null}
         </div>
       </div>
 

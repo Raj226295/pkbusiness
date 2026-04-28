@@ -17,6 +17,26 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    category: {
+      type: String,
+      default: 'general',
+      trim: true,
+    },
+    link: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    fileUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    actionLabel: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     read: {
       type: Boolean,
       default: false,

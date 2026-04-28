@@ -3,6 +3,7 @@ import PageHeader from '../../components/common/PageHeader.jsx'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import { siteBrand } from '../../data/siteData.js'
 import api, { extractApiError } from '../../lib/api.js'
 import { formatCurrency, formatDate } from '../../lib/formatters.js'
 
@@ -71,7 +72,7 @@ function Payments() {
       key: response.checkout.key,
       amount: response.checkout.amount,
       currency: response.checkout.currency,
-      name: 'Singh Verma & Associates',
+      name: siteBrand.name,
       description: response.checkout.description,
       order_id: response.checkout.orderId,
       prefill: response.checkout.prefill,

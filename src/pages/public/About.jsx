@@ -1,4 +1,5 @@
-import { aboutHighlights } from '../../data/siteData.js'
+import aboutPortrait from '../../assets/about-portrait.png'
+import { aboutHighlights, siteBrand } from '../../data/siteData.js'
 
 function About() {
   return (
@@ -8,18 +9,23 @@ function About() {
           <span className="eyebrow">About the Firm</span>
           <h1>Dedicated compliance advice with practical business context.</h1>
           <p>
-            Singh Verma & Associates supports businesses and individuals across tax filing, GST,
-            company law, audits, and bookkeeping. We focus on fast response times, accurate filings,
-            and clear explanations that help clients make confident decisions.
+            {siteBrand.name} supports businesses and individuals across tax filing, GST, company
+            law, audits, and bookkeeping. We focus on fast response times, accurate filings, and
+            clear explanations that help clients make confident decisions.
           </p>
         </div>
-        <article className="info-card feature-panel">
-          <h3>CA Profile</h3>
-          <ul className="bullet-list">
-            {aboutHighlights.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+        <article className="info-card feature-panel about-profile-card">
+          <div className="about-profile-media">
+            <img alt={`${siteBrand.name} advisor portrait`} src={aboutPortrait} />
+          </div>
+          <div className="about-profile-copy">
+            <h3>CA Profile</h3>
+            <ul className="bullet-list">
+              {aboutHighlights.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
         </article>
       </section>
 

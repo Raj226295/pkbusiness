@@ -15,6 +15,7 @@ import blogRoutes from './routes/blogRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
 import contactRoutes from './routes/contactRoutes.js'
+import { validateEnv } from './config/env.js'
 import { errorHandler, notFound } from './middleware/errorMiddleware.js'
 import { seedDefaults } from './utils/seedDefaults.js'
 
@@ -50,13 +51,14 @@ app.use(errorHandler)
 
 async function startServer() {
   try {
+    validateEnv()
     await connectDB()
     await seedDefaults()
     app.listen(port, () => {
       console.log(`Server running on port ${port}`)
     })
   } catch (error) {
-    console.error(error)
+    console.error(`Failed to start server: ${error.message}`)
     process.exit(1)
   }
 }

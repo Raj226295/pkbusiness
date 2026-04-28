@@ -1,4 +1,5 @@
 import express from 'express'
+import { uploadDocument } from '../controllers/documentController.js'
 import {
   assignService,
   deleteUser,
@@ -14,6 +15,7 @@ import {
   updateService,
 } from '../controllers/adminController.js'
 import { adminOnly, protect } from '../middleware/authMiddleware.js'
+import { upload } from '../middleware/uploadMiddleware.js'
 
 const router = express.Router()
 
@@ -23,6 +25,7 @@ router.get('/overview', getAdminOverview)
 router.get('/users', getAllUsers)
 router.delete('/users/:id', deleteUser)
 router.get('/documents', getAllDocuments)
+router.post('/documents/upload', upload.single('file'), uploadDocument)
 router.patch('/documents/:id', reviewDocument)
 router.get('/services', getAllServices)
 router.post('/services', assignService)

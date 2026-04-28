@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
+import { siteBrand, siteContact } from '../../data/siteData.js'
 
 function Footer() {
   return (
     <footer className="footer">
       <div className="footer-grid container">
         <div>
-          <span className="eyebrow">Trusted CA Partner</span>
+          <span className="eyebrow">{siteBrand.name}</span>
           <h3>Practical tax, compliance, and growth guidance for Indian businesses.</h3>
           <p>
             From incorporation to audit readiness, we help founders and families stay compliant and
@@ -26,7 +27,7 @@ function Footer() {
         <div>
           <h4>Office</h4>
           <div className="footer-links">
-            <span>3rd Floor, Civil Lines, New Delhi</span>
+            <span>{siteContact.address}</span>
             <a href="tel:+919999999999">+91 99999 99999</a>
             <a href="mailto:hello@svca.in">hello@svca.in</a>
           </div>
@@ -34,7 +35,7 @@ function Footer() {
       </div>
 
       <div className="footer-bottom container">
-        <span>&copy; {new Date().getFullYear()} Singh Verma & Associates. All rights reserved.</span>
+        <span>&copy; {new Date().getFullYear()} {siteBrand.name}. All rights reserved.</span>
       </div>
     </footer>
   )

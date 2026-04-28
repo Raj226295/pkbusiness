@@ -7,6 +7,10 @@ const documentSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     title: {
       type: String,
       required: true,

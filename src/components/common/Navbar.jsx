@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { publicNavLinks } from '../../data/siteData.js'
+import { publicNavLinks, siteBrand } from '../../data/siteData.js'
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -22,10 +22,10 @@ function Navbar() {
     <header className="navbar-wrap">
       <nav className="navbar">
         <Link className="brand" to="/">
-          <span className="brand-mark">SV</span>
+          <span className="brand-mark">{siteBrand.shortName}</span>
           <span>
-            <strong>Singh Verma & Associates</strong>
-            <small>Chartered Accountants</small>
+            <strong>{siteBrand.name}</strong>
+            <small>{siteBrand.tagline}</small>
           </span>
         </Link>
 
