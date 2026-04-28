@@ -2,7 +2,6 @@ import express from 'express'
 import { uploadDocument } from '../controllers/documentController.js'
 import {
   assignService,
-  deleteUser,
   getAdminOverview,
   getAllAppointments,
   getAllDocuments,
@@ -13,6 +12,7 @@ import {
   updateAppointment,
   updatePayment,
   updateService,
+  updateUserBlockStatus,
 } from '../controllers/adminController.js'
 import { adminOnly, protect } from '../middleware/authMiddleware.js'
 import { upload } from '../middleware/uploadMiddleware.js'
@@ -23,7 +23,7 @@ router.use(protect, adminOnly)
 
 router.get('/overview', getAdminOverview)
 router.get('/users', getAllUsers)
-router.delete('/users/:id', deleteUser)
+router.patch('/users/:id/block', updateUserBlockStatus)
 router.get('/documents', getAllDocuments)
 router.post('/documents/upload', upload.single('file'), uploadDocument)
 router.patch('/documents/:id', reviewDocument)

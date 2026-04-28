@@ -1,7 +1,6 @@
 import asyncHandler from '../middleware/asyncHandler.js'
 import Appointment from '../models/Appointment.js'
 import Document from '../models/Document.js'
-import Notification from '../models/Notification.js'
 import Payment from '../models/Payment.js'
 import Service from '../models/Service.js'
 import User from '../models/User.js'
@@ -39,7 +38,7 @@ export const getAllUsers = asyncHandler(async (_req, res) => {
   res.json({ users })
 })
 
-export const deleteUser = asyncHandler(async (req, res) => {
+export const updateUserBlockStatus = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
 
   if (!user) {
@@ -49,19 +48,18 @@ export const deleteUser = asyncHandler(async (req, res) => {
 
   if (user.role === 'admin') {
     res.status(400)
-    throw new Error('Admin accounts cannot be deleted from this panel')
+    throw new Error('Admin accounts cannot be blocked from this panel')
   }
 
-  await Promise.all([
-    Document.deleteMany({ user: user._id }),
-    Service.deleteMany({ user: user._id }),
-    Appointment.deleteMany({ user: user._id }),
-    Payment.deleteMany({ user: user._id }),
-    Notification.deleteMany({ user: user._id }),
-    User.findByIdAndDelete(user._id),
-  ])
+  const shouldBlock = typeof req.body.isBlocked === 'boolean' ? req.body.isBlocked : !user.isBlocked
+  user.isBlocked = shouldBlock
+  user.blockedAt = shouldBlock ? new Date() : null
+  await user.save()
 
-  res.json({ message: 'User and related records deleted successfully' })
+  res.json({
+    message: shouldBlock ? 'User blocked successfully' : 'User unblocked successfully',
+    user,
+  })
 })
 
 export const getAllDocuments = asyncHandler(async (_req, res) => {

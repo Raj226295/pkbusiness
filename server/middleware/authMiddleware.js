@@ -19,6 +19,11 @@ export const protect = asyncHandler(async (req, res, next) => {
     throw new Error('User not found')
   }
 
+  if (req.user.isBlocked) {
+    res.status(403)
+    throw new Error('This account has been blocked. Please contact the admin.')
+  }
+
   next()
 })
 

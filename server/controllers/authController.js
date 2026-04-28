@@ -10,6 +10,8 @@ function serializeUser(user) {
     email: user.email,
     phone: user.phone,
     companyName: user.companyName,
+    profileImage: user.profileImage,
+    isBlocked: user.isBlocked,
     role: user.role,
   }
 }
@@ -51,6 +53,11 @@ export const registerUser = asyncHandler(async (req, res) => {
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body
   const user = await User.findOne({ email: email?.toLowerCase() })
+
+  if (user?.isBlocked) {
+    res.status(403)
+    throw new Error('This account has been blocked. Please contact the admin.')
+  }
 
   if (!user || !(await user.matchPassword(password))) {
     res.status(401)

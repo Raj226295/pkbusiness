@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import UserAvatar from '../common/UserAvatar.jsx'
 
 const titleMap = {
   '/dashboard': 'Overview',
@@ -16,6 +17,7 @@ const titleMap = {
   '/admin/services': 'Service Assignment',
   '/admin/appointments': 'Appointment Desk',
   '/admin/payments': 'Transactions',
+  '/admin/profile': 'Profile',
 }
 
 function DashboardLayout({ role }) {
@@ -32,8 +34,11 @@ function DashboardLayout({ role }) {
             <h2>{titleMap[location.pathname] || 'Workspace'}</h2>
           </div>
           <div className="user-pill">
-            <strong>{user?.name}</strong>
-            <span>{user?.role === 'admin' ? 'Administrator' : 'Client'}</span>
+            <UserAvatar alt={`${user?.name || 'User'} profile image`} className="user-pill-avatar" user={user} />
+            <div className="user-pill-copy">
+              <strong>{user?.name}</strong>
+              <span>{user?.role === 'admin' ? 'Administrator' : 'Client'}</span>
+            </div>
           </div>
         </header>
 

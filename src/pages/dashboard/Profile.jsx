@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
+import UserAvatar from '../../components/common/UserAvatar.jsx'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import api, { extractApiError } from '../../lib/api.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 
 function Profile() {
   const { user, updateUser } = useAuth()
+  const [profileImage, setProfileImage] = useState(null)
+  const [imageInputKey, setImageInputKey] = useState(0)
+  const [imageSubmitting, setImageSubmitting] = useState(false)
   const [profileForm, setProfileForm] = useState({
     name: '',
     email: '',
@@ -42,6 +46,10 @@ function Profile() {
     }))
   }
 
+  const handleImageChange = (event) => {
+    setProfileImage(event.target.files?.[0] || null)
+  }
+
   const saveProfile = async (event) => {
     event.preventDefault()
     setStatus({ type: '', message: '' })
@@ -52,6 +60,37 @@ function Profile() {
       setStatus({ type: 'success', message: 'Profile updated successfully.' })
     } catch (error) {
       setStatus({ type: 'error', message: extractApiError(error) })
+    }
+  }
+
+  const uploadProfileImage = async (event) => {
+    event.preventDefault()
+
+    if (!profileImage) {
+      setStatus({ type: 'error', message: 'Please choose an image to upload.' })
+      return
+    }
+
+    setImageSubmitting(true)
+    setStatus({ type: '', message: '' })
+
+    const payload = new FormData()
+    payload.append('profileImage', profileImage)
+
+    try {
+      const { data } = await api.put('/api/user/profile/image', payload, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      updateUser(data.user)
+      setProfileImage(null)
+      setImageInputKey((current) => current + 1)
+      setStatus({ type: 'success', message: 'Profile image updated successfully.' })
+    } catch (error) {
+      setStatus({ type: 'error', message: extractApiError(error) })
+    } finally {
+      setImageSubmitting(false)
     }
   }
 
@@ -71,7 +110,7 @@ function Profile() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="Maintain your contact details and keep your account secure."
+        description="Maintain your contact details, update your profile image, and keep your account secure."
         eyebrow="Profile"
         title="Account Settings"
       />
@@ -79,6 +118,28 @@ function Profile() {
       {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
 
       <section className="card-grid two-up">
+        <article className="panel form-panel">
+          <h3>Profile photo</h3>
+          <div className="profile-avatar-panel">
+            <UserAvatar alt={`${user?.name || 'User'} profile image`} className="profile-avatar-lg" user={user} />
+          </div>
+          <form className="profile-image-form" onSubmit={uploadProfileImage}>
+            <label>
+              Upload image
+              <input
+                accept="image/*"
+                key={imageInputKey}
+                name="profileImage"
+                onChange={handleImageChange}
+                type="file"
+              />
+            </label>
+            <button className="button button-secondary" disabled={imageSubmitting} type="submit">
+              {imageSubmitting ? 'Uploading...' : 'Upload Photo'}
+            </button>
+          </form>
+        </article>
+
         <form className="panel form-panel" onSubmit={saveProfile}>
           <h3>Update details</h3>
           <label>
@@ -101,35 +162,35 @@ function Profile() {
             Save Profile
           </button>
         </form>
-
-        <form className="panel form-panel" onSubmit={changePassword}>
-          <h3>Change password</h3>
-          <label>
-            Current password
-            <input
-              name="currentPassword"
-              onChange={handlePasswordChange}
-              required
-              type="password"
-              value={passwordForm.currentPassword}
-            />
-          </label>
-          <label>
-            New password
-            <input
-              minLength="6"
-              name="newPassword"
-              onChange={handlePasswordChange}
-              required
-              type="password"
-              value={passwordForm.newPassword}
-            />
-          </label>
-          <button className="button button-primary" type="submit">
-            Update Password
-          </button>
-        </form>
       </section>
+
+      <form className="panel form-panel" onSubmit={changePassword}>
+        <h3>Change password</h3>
+        <label>
+          Current password
+          <input
+            name="currentPassword"
+            onChange={handlePasswordChange}
+            required
+            type="password"
+            value={passwordForm.currentPassword}
+          />
+        </label>
+        <label>
+          New password
+          <input
+            minLength="6"
+            name="newPassword"
+            onChange={handlePasswordChange}
+            required
+            type="password"
+            value={passwordForm.newPassword}
+          />
+        </label>
+        <button className="button button-primary" type="submit">
+          Update Password
+        </button>
+      </form>
     </div>
   )
 }

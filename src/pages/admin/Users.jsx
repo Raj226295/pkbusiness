@@ -25,15 +25,22 @@ function Users() {
       })
   }, [])
 
-  const deleteUser = async (userId) => {
-    if (!window.confirm('Delete this user and their related records?')) {
+  const toggleUserBlock = async (userId, currentStatus) => {
+    const nextAction = currentStatus ? 'unblock' : 'block'
+
+    if (!window.confirm(`Do you want to ${nextAction} this user?`)) {
       return
     }
 
     try {
-      await api.delete(`/api/admin/users/${userId}`)
+      await api.patch(`/api/admin/users/${userId}/block`, {
+        isBlocked: !currentStatus,
+      })
       await loadUsers()
-      setStatus({ type: 'success', message: 'User deleted successfully.' })
+      setStatus({
+        type: 'success',
+        message: currentStatus ? 'User unblocked successfully.' : 'User blocked successfully.',
+      })
     } catch (error) {
       setStatus({ type: 'error', message: extractApiError(error) })
     }
@@ -46,7 +53,7 @@ function Users() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="View registered users, their roles, and remove accounts when needed."
+        description="View registered users, their roles, and block or unblock access when needed."
         eyebrow="Admin"
         title="Users"
       />
@@ -62,15 +69,24 @@ function Users() {
                   <strong>{user.name}</strong>
                   <p>{user.email}</p>
                 </div>
-                <span className="status-badge neutral">{user.role}</span>
+                <div className="list-meta-group">
+                  <span className="status-badge neutral">{user.role}</span>
+                  <span className={`status-badge ${user.isBlocked ? 'danger' : 'success'}`}>
+                    {user.isBlocked ? 'blocked' : 'active'}
+                  </span>
+                </div>
               </div>
               <div className="detail-row">
                 <span>{user.phone || 'No phone added'}</span>
                 <span>Joined {formatDate(user.createdAt)}</span>
               </div>
               {user.role !== 'admin' ? (
-                <button className="button button-danger" onClick={() => deleteUser(user._id)} type="button">
-                  Delete User
+                <button
+                  className={`button ${user.isBlocked ? 'button-secondary' : 'button-danger'}`}
+                  onClick={() => toggleUserBlock(user._id, user.isBlocked)}
+                  type="button"
+                >
+                  {user.isBlocked ? 'Unblock User' : 'Block User'}
                 </button>
               ) : null}
             </article>

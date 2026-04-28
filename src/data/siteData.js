@@ -67,9 +67,39 @@ export const testimonials = [
 ]
 
 export const aboutHighlights = [
-  '12+ years of practice across direct tax, GST, audit, and company law matters.',
-  'Fellow Chartered Accountant with startup, SME, and professional services expertise.',
-  'Hands-on partner involvement with response-driven support during notices and deadlines.',
+  'Support for ITR filing, GST registration, Udyam registration, and everyday compliance work.',
+  'Clear document checklists and step-by-step updates from first review to final submission.',
+  'Friendly local guidance for individuals, shop owners, and growing businesses in Purnia and beyond.',
+]
+
+export const aboutPillars = [
+  {
+    title: 'Clarity First',
+    description:
+      'We explain requirements in simple language so clients know exactly what is needed and what comes next.',
+  },
+  {
+    title: 'Responsive Support',
+    description:
+      'Questions, documents, and urgent deadlines are handled with a practical, action-oriented approach.',
+  },
+  {
+    title: 'Long-Term Partnership',
+    description:
+      'Our goal is to become a dependable support system for repeat filings, registrations, and business paperwork.',
+  },
+]
+
+export const aboutSupportAreas = [
+  'Income tax return filing for salaried, business, and professional clients.',
+  'GST registration, return filing, and routine compliance support for active businesses.',
+  'Udyam registration, business documentation, and guidance for early-stage setups.',
+]
+
+export const aboutWorkStyle = [
+  'Personal attention instead of one-size-fits-all advice.',
+  'Organized document collection with fewer follow-up loops.',
+  'Timely coordination so important deadlines do not get missed.',
 ]
 
 export const dashboardLinks = [
@@ -89,4 +119,5 @@ export const adminLinks = [
   { label: 'Services', to: '/admin/services' },
   { label: 'Appointments', to: '/admin/appointments' },
   { label: 'Payments', to: '/admin/payments' },
+  { label: 'Profile', to: '/admin/profile' },
 ]

@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom'
+import homeHeroPoster from '../../assets/home-hero-poster.jpg'
 import { serviceCatalog, testimonials } from '../../data/siteData.js'
 
 function Home() {
   return (
     <div className="page-stack">
-      <section className="hero-section container">
-        <div className="hero-copy">
-          <span className="eyebrow">End-to-end CA advisory</span>
-          <h1>Tax, compliance, and finance operations that keep your business moving.</h1>
+      <section className="hero-section home-hero-section container">
+        <div className="hero-copy home-hero-copy">
+          <span className="eyebrow">Trusted business partner</span>
+          <h1>ITR, GST, and business compliance support that keeps you one step ahead.</h1>
           <p>
-            We help startups, professionals, and families manage income tax, GST, audit, company
-            registration, and books with clarity and speed.
+            We help professionals, families, shop owners, and growing businesses manage tax filing,
+            registrations, and routine compliance with clarity, speed, and personal attention.
           </p>
           <div className="hero-actions">
             <Link className="button button-primary" to="/contact">
@@ -36,13 +37,20 @@ function Home() {
           </div>
         </div>
 
-        <div className="hero-panel">
-          <span className="panel-chip">CA dashboard ready</span>
-          <h3>One portal for documents, appointments, invoices, and service updates.</h3>
+        <div className="hero-panel home-hero-panel">
+          <div className="home-hero-media">
+            <img alt="PK Business service poster" src={homeHeroPoster} />
+          </div>
+          <span className="panel-chip">Purnia & Beyond</span>
+          <h3>Practical support for tax filing, GST registration, and Udyam documentation.</h3>
+          <p>
+            Clear advice, organized paperwork, and dependable follow-through for clients who want a
+            smoother compliance experience.
+          </p>
           <ul className="bullet-list">
-            <li>Secure document uploads for ITR, GST, and audit work</li>
-            <li>Live status tracking for ongoing assignments</li>
-            <li>Consultation booking and payment visibility in one place</li>
+            <li>Dedicated support for ITR filing, GST work, and Udyam registration</li>
+            <li>Simple document collection with fast coordination on active tasks</li>
+            <li>Consultation and follow-up support that stays easy to understand</li>
           </ul>
         </div>
       </section>

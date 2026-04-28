@@ -25,6 +25,19 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    profileImage: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    blockedAt: {
+      type: Date,
+      default: null,
+    },
     password: {
       type: String,
       required: true,

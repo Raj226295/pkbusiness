@@ -15,17 +15,61 @@ export async function seedDefaults() {
     return
   }
 
-  const adminExists = await User.findOne({ email: process.env.ADMIN_EMAIL.toLowerCase() })
+  const normalizedAdminEmail = process.env.ADMIN_EMAIL.toLowerCase()
+  let adminUser = await User.findOne({ email: normalizedAdminEmail })
 
-  if (!adminExists) {
-    // Seed an admin only when explicit credentials are supplied in the environment.
+  if (!adminUser) {
+    adminUser = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 })
+  }
+
+  if (!adminUser) {
     await User.create({
       name: process.env.ADMIN_NAME || 'CA Admin',
-      email: process.env.ADMIN_EMAIL,
+      email: normalizedAdminEmail,
       phone: process.env.ADMIN_PHONE || '9999999999',
       password: process.env.ADMIN_PASSWORD,
       role: 'admin',
+      isBlocked: false,
     })
     console.log('Default admin seeded')
+    return
+  }
+
+  let hasChanges = false
+
+  if (adminUser.name !== (process.env.ADMIN_NAME || 'CA Admin')) {
+    adminUser.name = process.env.ADMIN_NAME || 'CA Admin'
+    hasChanges = true
+  }
+
+  if (adminUser.email !== normalizedAdminEmail) {
+    adminUser.email = normalizedAdminEmail
+    hasChanges = true
+  }
+
+  if (adminUser.phone !== (process.env.ADMIN_PHONE || '9999999999')) {
+    adminUser.phone = process.env.ADMIN_PHONE || '9999999999'
+    hasChanges = true
+  }
+
+  if (adminUser.role !== 'admin') {
+    adminUser.role = 'admin'
+    hasChanges = true
+  }
+
+  if (adminUser.isBlocked) {
+    adminUser.isBlocked = false
+    adminUser.blockedAt = null
+    hasChanges = true
+  }
+
+  if (!(await adminUser.matchPassword(process.env.ADMIN_PASSWORD))) {
+    adminUser.password = process.env.ADMIN_PASSWORD
+    hasChanges = true
+  }
+
+  if (hasChanges) {
+    await adminUser.save()
+    console.log('Default admin synchronized')
   }
 }

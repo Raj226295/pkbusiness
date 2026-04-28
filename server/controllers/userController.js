@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import asyncHandler from '../middleware/asyncHandler.js'
 import User from '../models/User.js'
 
@@ -8,12 +10,27 @@ function serializeUser(user) {
     email: user.email,
     phone: user.phone,
     companyName: user.companyName,
+    profileImage: user.profileImage,
+    isBlocked: user.isBlocked,
     role: user.role,
   }
 }
 
+function removeStoredFile(fileUrl) {
+  if (!fileUrl) {
+    return
+  }
+
+  const fileName = path.basename(fileUrl)
+  const absolutePath = path.resolve('server', 'uploads', fileName)
+
+  if (fs.existsSync(absolutePath)) {
+    fs.unlinkSync(absolutePath)
+  }
+}
+
 export const getProfile = asyncHandler(async (req, res) => {
-  res.json({ user: req.user })
+  res.json({ user: serializeUser(req.user) })
 })
 
 export const updateProfile = asyncHandler(async (req, res) => {
@@ -45,6 +62,33 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
   res.json({
     message: 'Profile updated successfully',
+    user: serializeUser(updatedUser),
+  })
+})
+
+export const updateProfileImage = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+
+  if (!user) {
+    res.status(404)
+    throw new Error('User not found')
+  }
+
+  if (!req.file) {
+    res.status(400)
+    throw new Error('Please upload a profile image')
+  }
+
+  const previousProfileImage = user.profileImage
+  user.profileImage = `/uploads/${req.file.filename}`
+  const updatedUser = await user.save()
+
+  if (previousProfileImage && previousProfileImage !== updatedUser.profileImage) {
+    removeStoredFile(previousProfileImage)
+  }
+
+  res.json({
+    message: 'Profile image updated successfully',
     user: serializeUser(updatedUser),
   })
 })
