@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { adminLinks, dashboardLinks, siteBrand } from '../../data/siteData.js'
+import AdminIcon from '../admin/AdminIcon.jsx'
 
 function Sidebar({ role = 'user' }) {
   const { user, logout } = useAuth()
@@ -13,13 +14,13 @@ function Sidebar({ role = 'user' }) {
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${role === 'admin' ? 'admin-sidebar' : ''}`}>
       <div className="sidebar-brand">
         <span className="brand-mark">{siteBrand.shortName}</span>
         <div>
           <strong>{siteBrand.name}</strong>
-          <small>{role === 'admin' ? 'Admin Workspace' : 'Client Portal'}</small>
-          {user?.name ? <small>{user.name}</small> : null}
+          <small>{role === 'admin' ? 'Client Portal Admin' : 'Client Portal'}</small>
+          {role === 'admin' ? <span className="role-chip admin sidebar-role-chip">ADMIN</span> : user?.name ? <small>{user.name}</small> : null}
         </div>
       </div>
 
@@ -31,12 +32,26 @@ function Sidebar({ role = 'user' }) {
             className={({ isActive }) => (isActive ? 'sidebar-link active' : 'sidebar-link')}
             to={link.to}
           >
-            {link.label}
+            {link.icon ? (
+              <span className="sidebar-link-icon">
+                <AdminIcon name={link.icon} size={16} />
+              </span>
+            ) : null}
+            <span>{link.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <button className="button button-primary sidebar-logout" onClick={handleLogout} type="button">
+      <button
+        className="button button-primary button-compact sidebar-logout"
+        onClick={handleLogout}
+        type="button"
+      >
+        {role === 'admin' ? (
+          <span className="sidebar-link-icon">
+            <AdminIcon name="logout" size={16} />
+          </span>
+        ) : null}
         Logout
       </button>
     </aside>

@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
 import api, { extractApiError } from '../../lib/api.js'
-import { formatDate } from '../../lib/formatters.js'
+import { formatDateTime } from '../../lib/formatters.js'
 
 const initialForm = {
   scheduledFor: '',
@@ -17,6 +17,16 @@ function Appointments() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
+
+  const summary = useMemo(() => {
+    return {
+      total: appointments.length,
+      active: appointments.filter((appointment) =>
+        ['pending', 'confirmed', 'scheduled'].includes(appointment.status),
+      ).length,
+      completed: appointments.filter((appointment) => appointment.status === 'completed').length,
+    }
+  }, [appointments])
 
   const loadAppointments = async () => {
     const { data } = await api.get('/api/appointments')
@@ -64,7 +74,7 @@ function Appointments() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="Schedule a consultation slot and keep a history of your previous meetings."
+        description="Request a consultation, track approval status, and see admin scheduling notes once the meeting is reviewed."
         eyebrow="Appointments"
         title="Consultation Booking"
       />
@@ -101,25 +111,47 @@ function Appointments() {
           </button>
         </form>
 
-        <article className="panel">
-          <h3>Appointment history</h3>
-          {appointments.length ? (
-            <div className="list-stack">
-              {appointments.map((appointment) => (
-                <div className="list-item stretch" key={appointment._id}>
-                  <div>
-                    <strong>{formatDate(appointment.scheduledFor, { dateStyle: 'medium', timeStyle: 'short' })}</strong>
-                    <p>{appointment.notes || 'General consultation request'}</p>
-                  </div>
-                  <StatusBadge status={appointment.status} />
-                </div>
-              ))}
+        <article className="panel document-summary-panel">
+          <h3>Appointment summary</h3>
+          <div className="document-summary-grid">
+            <div className="document-stat-tile">
+              <strong>{summary.total}</strong>
+              <span>Total requests</span>
             </div>
-          ) : (
-            <EmptyState description="Your booked consultations will show up here." title="No appointments yet" />
-          )}
+            <div className="document-stat-tile">
+              <strong>{summary.active}</strong>
+              <span>Active requests</span>
+            </div>
+            <div className="document-stat-tile">
+              <strong>{summary.completed}</strong>
+              <span>Completed</span>
+            </div>
+          </div>
+          <ul className="bullet-list">
+            <li>New bookings first go to admin for confirmation.</li>
+            <li>Once reviewed, updated status and admin notes will appear in your history below.</li>
+          </ul>
         </article>
       </section>
+
+      {appointments.length ? (
+        <div className="list-stack">
+          {appointments.map((appointment) => (
+            <article className="panel" key={appointment._id}>
+              <div className="list-item stretch">
+                <div>
+                  <strong>{formatDateTime(appointment.scheduledFor)}</strong>
+                  <p>{appointment.notes || 'General consultation request'}</p>
+                  {appointment.adminNotes ? <small>Admin notes: {appointment.adminNotes}</small> : null}
+                </div>
+                <StatusBadge status={appointment.status} />
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState description="Your booked consultations will show up here." title="No appointments yet" />
+      )}
     </div>
   )
 }

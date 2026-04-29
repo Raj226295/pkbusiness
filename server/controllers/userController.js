@@ -11,9 +11,22 @@ function serializeUser(user) {
     phone: user.phone,
     companyName: user.companyName,
     profileImage: user.profileImage,
+    profileImageZoom: user.profileImageZoom,
+    profileImageOffsetX: user.profileImageOffsetX,
+    profileImageOffsetY: user.profileImageOffsetY,
     isBlocked: user.isBlocked,
     role: user.role,
   }
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsedValue = Number.parseFloat(value)
+
+  if (Number.isNaN(parsedValue)) {
+    return fallback
+  }
+
+  return Math.min(Math.max(parsedValue, min), max)
 }
 
 function removeStoredFile(fileUrl) {
@@ -74,16 +87,20 @@ export const updateProfileImage = asyncHandler(async (req, res) => {
     throw new Error('User not found')
   }
 
-  if (!req.file) {
+  if (!req.file && !user.profileImage) {
     res.status(400)
     throw new Error('Please upload a profile image')
   }
 
   const previousProfileImage = user.profileImage
-  user.profileImage = `/uploads/${req.file.filename}`
+  const nextProfileImage = req.file ? `/uploads/${req.file.filename}` : user.profileImage
+  user.profileImage = nextProfileImage
+  user.profileImageZoom = clampNumber(req.body.zoom, 1, 2.5, user.profileImageZoom || 1)
+  user.profileImageOffsetX = clampNumber(req.body.offsetX, -35, 35, user.profileImageOffsetX || 0)
+  user.profileImageOffsetY = clampNumber(req.body.offsetY, -35, 35, user.profileImageOffsetY || 0)
   const updatedUser = await user.save()
 
-  if (previousProfileImage && previousProfileImage !== updatedUser.profileImage) {
+  if (req.file && previousProfileImage && previousProfileImage !== updatedUser.profileImage) {
     removeStoredFile(previousProfileImage)
   }
 

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import loginTaxFile from '../../assets/login-tax-file.jpg'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { siteBrand } from '../../data/siteData.js'
 import { extractApiError } from '../../lib/api.js'
 
 function Login() {
@@ -37,37 +39,58 @@ function Login() {
 
   return (
     <section className="auth-shell container">
-      <form className="panel auth-card" onSubmit={handleSubmit}>
-        <span className="eyebrow">Welcome back</span>
-        <h1>Client Login</h1>
-        <p>Access your documents, appointments, payments, and active services.</p>
+      <div className="split-section auth-layout">
+        <form className="panel auth-card" onSubmit={handleSubmit}>
+          <div className="auth-brand">
+            <Link className="brand auth-brand-lockup" to="/">
+              <span className="brand-mark">{siteBrand.shortName}</span>
+              <span>
+                <strong>{siteBrand.name}</strong>
+                <small>{siteBrand.tagline}</small>
+              </span>
+            </Link>
+            <span className="auth-tag">Client Portal</span>
+          </div>
 
-        <label>
-          Email
-          <input name="email" onChange={handleChange} required type="email" value={form.email} />
-        </label>
+          <div className="auth-intro">
+            <span className="eyebrow">Welcome back</span>
+            <h1>Client Login</h1>
+            <p>Access your documents, appointments, payments, and active services.</p>
+          </div>
 
-        <label>
-          Password
-          <input
-            name="password"
-            onChange={handleChange}
-            required
-            type="password"
-            value={form.password}
-          />
-        </label>
+          <label>
+            Email
+            <input name="email" onChange={handleChange} required type="email" value={form.email} />
+          </label>
 
-        {error ? <p className="form-message error">{error}</p> : null}
+          <label>
+            Password
+            <input
+              name="password"
+              onChange={handleChange}
+              required
+              type="password"
+              value={form.password}
+            />
+          </label>
 
-        <button className="button button-primary" disabled={submitting} type="submit">
-          {submitting ? 'Signing in...' : 'Login'}
-        </button>
+          {error ? <p className="form-message error">{error}</p> : null}
 
-        <p className="auth-meta">
-          Need an account? <Link to="/register">Create one here</Link>
-        </p>
-      </form>
+          <button className="button button-primary" disabled={submitting} type="submit">
+            {submitting ? 'Signing in...' : 'Login'}
+          </button>
+
+          <p className="auth-meta">
+            Need an account? <Link to="/register">Create one here</Link>
+          </p>
+        </form>
+
+        <article className="panel auth-visual" aria-hidden="true">
+          <div className="auth-visual-media">
+            <img alt="PK Business professional reviewing tax file documents" src={loginTaxFile} />
+          </div>
+        </article>
+      </div>
     </section>
   )
 }

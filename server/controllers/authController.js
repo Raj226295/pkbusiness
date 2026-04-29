@@ -11,6 +11,9 @@ function serializeUser(user) {
     phone: user.phone,
     companyName: user.companyName,
     profileImage: user.profileImage,
+    profileImageZoom: user.profileImageZoom,
+    profileImageOffsetX: user.profileImageOffsetX,
+    profileImageOffsetY: user.profileImageOffsetY,
     isBlocked: user.isBlocked,
     role: user.role,
   }

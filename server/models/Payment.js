@@ -26,13 +26,23 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    paymentMethod: {
+      type: String,
+      enum: ['online', 'manual'],
+      default: 'online',
+    },
     currency: {
       type: String,
       default: 'INR',
     },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
+      enum: ['pending', 'paid', 'failed', 'rejected'],
+      default: 'pending',
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
       default: 'pending',
     },
     transactionId: {
@@ -49,6 +59,27 @@ const paymentSchema = new mongoose.Schema(
     },
     paidAt: {
       type: Date,
+    },
+    screenshotUrl: {
+      type: String,
+      default: '',
+    },
+    screenshotName: {
+      type: String,
+      default: '',
+    },
+    reviewRemarks: {
+      type: String,
+      default: '',
+    },
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

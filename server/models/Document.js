@@ -16,6 +16,11 @@ const documentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    documentType: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     serviceType: {
       type: String,
       required: true,
@@ -24,6 +29,18 @@ const documentSchema = new mongoose.Schema(
     filename: {
       type: String,
       required: true,
+    },
+    originalName: {
+      type: String,
+      default: '',
+    },
+    relativePath: {
+      type: String,
+      default: '',
+    },
+    storageFolder: {
+      type: String,
+      default: '',
     },
     fileUrl: {
       type: String,
@@ -35,12 +52,25 @@ const documentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'verified', 'rejected'],
+      enum: ['pending', 'approved', 'verified', 'rejected'],
       default: 'pending',
     },
     remarks: {
       type: String,
       default: '',
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

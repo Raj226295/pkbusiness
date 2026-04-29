@@ -58,17 +58,14 @@ function Navbar() {
                 <Link className="button button-ghost" to={user.role === 'admin' ? '/admin' : '/dashboard'}>
                   {user.role === 'admin' ? 'Admin Panel' : 'Dashboard'}
                 </Link>
-                <button className="button button-primary" onClick={handleLogout} type="button">
+                <button className="button button-primary button-compact" onClick={handleLogout} type="button">
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <Link className="button button-ghost" to="/login">
+                <Link className="button button-login" to="/login">
                   Login
-                </Link>
-                <Link className="button button-primary" to="/contact">
-                  Book Consultation
                 </Link>
               </>
             )}

@@ -1,6 +1,8 @@
 import Blog from '../models/Blog.js'
+import ServiceCatalog from '../models/ServiceCatalog.js'
 import User from '../models/User.js'
 import { defaultBlogs } from '../constants/defaultBlogs.js'
+import { defaultServiceCatalog } from '../constants/defaultServiceCatalog.js'
 
 export async function seedDefaults() {
   const existingBlogCount = await Blog.countDocuments()
@@ -11,16 +13,21 @@ export async function seedDefaults() {
     console.log('Default blogs seeded')
   }
 
+  const existingServiceCatalogCount = await ServiceCatalog.countDocuments()
+
+  if (!existingServiceCatalogCount) {
+    await ServiceCatalog.insertMany(defaultServiceCatalog)
+    console.log('Default service catalog seeded')
+  }
+
   if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
     return
   }
 
   const normalizedAdminEmail = process.env.ADMIN_EMAIL.toLowerCase()
-  let adminUser = await User.findOne({ email: normalizedAdminEmail })
-
-  if (!adminUser) {
-    adminUser = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 })
-  }
+  const adminUser =
+    (await User.findOne({ email: normalizedAdminEmail })) ||
+    (await User.findOne({ role: 'admin' }).sort({ createdAt: 1 }))
 
   if (!adminUser) {
     await User.create({
@@ -32,44 +39,5 @@ export async function seedDefaults() {
       isBlocked: false,
     })
     console.log('Default admin seeded')
-    return
-  }
-
-  let hasChanges = false
-
-  if (adminUser.name !== (process.env.ADMIN_NAME || 'CA Admin')) {
-    adminUser.name = process.env.ADMIN_NAME || 'CA Admin'
-    hasChanges = true
-  }
-
-  if (adminUser.email !== normalizedAdminEmail) {
-    adminUser.email = normalizedAdminEmail
-    hasChanges = true
-  }
-
-  if (adminUser.phone !== (process.env.ADMIN_PHONE || '9999999999')) {
-    adminUser.phone = process.env.ADMIN_PHONE || '9999999999'
-    hasChanges = true
-  }
-
-  if (adminUser.role !== 'admin') {
-    adminUser.role = 'admin'
-    hasChanges = true
-  }
-
-  if (adminUser.isBlocked) {
-    adminUser.isBlocked = false
-    adminUser.blockedAt = null
-    hasChanges = true
-  }
-
-  if (!(await adminUser.matchPassword(process.env.ADMIN_PASSWORD))) {
-    adminUser.password = process.env.ADMIN_PASSWORD
-    hasChanges = true
-  }
-
-  if (hasChanges) {
-    await adminUser.save()
-    console.log('Default admin synchronized')
   }
 }

@@ -1,44 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../../components/common/PageHeader.jsx'
-import StatusBadge from '../../components/common/StatusBadge.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import StatusBadge from '../../components/common/StatusBadge.jsx'
+import UserAvatar from '../../components/common/UserAvatar.jsx'
 import api, { extractApiError } from '../../lib/api.js'
-import { formatDate } from '../../lib/formatters.js'
-
-const initialForm = {
-  title: '',
-  serviceType: 'Income Tax Filing',
-  userId: '',
-  file: null,
-}
+import { downloadFileFromApi } from '../../lib/downloads.js'
+import { formatDate, formatDateTime } from '../../lib/formatters.js'
 
 function Documents() {
+  const [searchParams] = useSearchParams()
   const [documents, setDocuments] = useState([])
+  const [folders, setFolders] = useState([])
   const [users, setUsers] = useState([])
-  const [form, setForm] = useState(initialForm)
-  const [review, setReview] = useState({})
+  const [activeUserId, setActiveUserId] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [downloadingId, setDownloadingId] = useState('')
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
 
-  const loadPageData = async () => {
+  const loadData = async () => {
     const [{ data: documentsData }, { data: usersData }] = await Promise.all([
       api.get('/api/admin/documents'),
       api.get('/api/admin/users'),
     ])
 
-    const clientUsers = usersData.users.filter((user) => user.role !== 'admin')
-    setDocuments(documentsData.documents)
+    const clientUsers = (usersData.users || []).filter((user) => user.role !== 'admin')
+    setDocuments(documentsData.documents || [])
+    setFolders(documentsData.folders || [])
     setUsers(clientUsers)
-    setForm((current) => ({
-      ...current,
-      userId: current.userId || clientUsers[0]?._id || '',
-    }))
+    setActiveUserId((current) => (clientUsers.some((user) => user._id === current) ? current : clientUsers[0]?._id || ''))
   }
 
   useEffect(() => {
-    loadPageData()
+    loadData()
       .catch((error) => {
         setStatus({ type: 'error', message: extractApiError(error) })
       })
@@ -47,183 +43,206 @@ function Documents() {
       })
   }, [])
 
-  const handleChange = (event) => {
-    const { name, value, files } = event.target
+  const folderCards = useMemo(() => {
+    const userLookup = new Map(users.map((user) => [user._id, user]))
 
-    setForm((current) => ({
-      ...current,
-      [name]: files ? files[0] : value,
-    }))
-  }
+    return folders
+      .map((folder) => {
+        const user = userLookup.get(folder.userId)
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setSubmitting(true)
-    setStatus({ type: '', message: '' })
+        if (!user) {
+          return null
+        }
 
-    const payload = new FormData()
-    payload.append('title', form.title)
-    payload.append('serviceType', form.serviceType)
-    payload.append('userId', form.userId)
-    payload.append('file', form.file)
+        return {
+          userId: folder.userId,
+          user,
+          totalFiles: folder.documentCount || 0,
+          pendingCount: folder.pendingCount || 0,
+          approvedCount: folder.approvedCount || 0,
+          rejectedCount: folder.rejectedCount || 0,
+          lastUploadDate: folder.lastSubmittedAt || '',
+        }
+      })
+      .filter(Boolean)
+      .sort((left, right) => {
+        if (!left.lastUploadDate && !right.lastUploadDate) return left.user.name.localeCompare(right.user.name)
+        if (!left.lastUploadDate) return 1
+        if (!right.lastUploadDate) return -1
+        return new Date(right.lastUploadDate) - new Date(left.lastUploadDate)
+      })
+  }, [folders, users])
+
+  const activeFolder = useMemo(
+    () => folderCards.find((folder) => folder.userId === activeUserId) || folderCards[0] || null,
+    [activeUserId, folderCards],
+  )
+
+  useEffect(() => {
+    const requestedUserId = searchParams.get('userId')
+
+    if (!requestedUserId) {
+      return
+    }
+
+    if (folderCards.some((folder) => folder.userId === requestedUserId)) {
+      setActiveUserId(requestedUserId)
+    }
+  }, [folderCards, searchParams])
+
+  const activeDocuments = useMemo(() => {
+    return documents.filter((document) => {
+      const matchesUser = document.user?._id === activeFolder?.userId
+      const matchesStatus = statusFilter === 'all' || document.status === statusFilter
+      return matchesUser && matchesStatus
+    })
+  }, [activeFolder, documents, statusFilter])
+
+  const handleDownload = async (document) => {
+    setDownloadingId(document._id)
 
     try {
-      await api.post('/api/admin/documents/upload', payload, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      setForm({
-        ...initialForm,
-        userId: users[0]?._id || '',
-        file: null,
-      })
-      await loadPageData()
-      setStatus({ type: 'success', message: 'Document shared with user successfully.' })
+      await downloadFileFromApi(document.downloadUrl, document.originalName || document.filename)
     } catch (error) {
       setStatus({ type: 'error', message: extractApiError(error) })
     } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const updateReviewField = (documentId, field, value) => {
-    setReview((current) => ({
-      ...current,
-      [documentId]: {
-        status: current[documentId]?.status || 'verified',
-        remarks: current[documentId]?.remarks || '',
-        [field]: value,
-      },
-    }))
-  }
-
-  const submitReview = async (documentId) => {
-    const payload = review[documentId] || { status: 'verified', remarks: '' }
-
-    try {
-      await api.patch(`/api/admin/documents/${documentId}`, payload)
-      await loadPageData()
-      setStatus({ type: 'success', message: 'Document updated successfully.' })
-    } catch (error) {
-      setStatus({ type: 'error', message: extractApiError(error) })
+      setDownloadingId('')
     }
   }
 
   if (loading) {
-    return <Loader message="Loading uploaded files..." />
+    return <Loader message="Loading client folders..." />
   }
 
   return (
     <div className="page-stack">
       <PageHeader
-        description="Review uploaded files, approve or reject them, and share documents directly with clients."
-        eyebrow="Admin"
-        title="Document Review"
+        description="Open user-wise document folders, review every uploaded file, and preview or download the records you need."
+        eyebrow="My Folder"
+        title="Client Folders"
       />
 
       {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
 
-      <section className="card-grid two-up">
-        <form className="panel form-panel" onSubmit={handleSubmit}>
-          <h3>Send document to a user</h3>
-          <label>
-            Select user
-            <select name="userId" onChange={handleChange} required value={form.userId}>
-              {users.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.name} ({user.email})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Document title
-            <input name="title" onChange={handleChange} required type="text" value={form.title} />
-          </label>
-          <label>
-            Service type
-            <select name="serviceType" onChange={handleChange} value={form.serviceType}>
-              <option>Income Tax Filing</option>
-              <option>GST Registration & Return</option>
-              <option>Audit Services</option>
-              <option>Company Registration</option>
-              <option>Accounting / Bookkeeping</option>
-            </select>
-          </label>
-          <label>
-            File
-            <input accept=".pdf,image/*" name="file" onChange={handleChange} required type="file" />
-          </label>
-
-          <button className="button button-primary" disabled={submitting || !users.length} type="submit">
-            {submitting ? 'Sharing...' : 'Share Document'}
+      <section className="admin-folder-grid">
+        {folderCards.map((folder) => (
+          <button
+            className={`admin-folder-card ${activeFolder?.userId === folder.userId ? 'active' : ''}`}
+            key={folder.userId}
+            onClick={() => setActiveUserId(folder.userId)}
+            type="button"
+          >
+            <div className="admin-folder-card-head">
+              <UserAvatar alt={`${folder.user.name} profile`} className="admin-folder-avatar" user={folder.user} />
+              <div>
+                <strong>{folder.user.name}</strong>
+                <span>{folder.user.name} Folder</span>
+                <span>{folder.user.email}</span>
+              </div>
+            </div>
+            <div className="admin-folder-card-stats">
+              <span>{folder.totalFiles} files</span>
+              <span>{folder.pendingCount} pending</span>
+            </div>
+            <small>
+              {folder.lastUploadDate ? `Last upload ${formatDate(folder.lastUploadDate)}` : 'No uploads yet'}
+            </small>
           </button>
-        </form>
-
-        <article className="panel">
-          <h3>Shared visibility</h3>
-          <p>Client uploads come here for review, and documents shared from this panel appear in that user's dashboard.</p>
-          <ul className="bullet-list">
-            <li>User uploads are visible in admin review automatically.</li>
-            <li>Admin-shared documents are visible to the selected user.</li>
-            <li>Review status and remarks stay synced on both sides.</li>
-          </ul>
-        </article>
+        ))}
       </section>
 
-      {documents.length ? (
-        <div className="list-stack">
-          {documents.map((document) => {
-            const currentReview = review[document._id] || { status: document.status, remarks: document.remarks || '' }
-            const senderName = document.uploadedBy?.name || document.user?.name || 'Unknown'
+      <section className="panel admin-folder-detail">
+        {activeFolder ? (
+          <>
+            <div className="admin-folder-detail-head">
+              <div>
+                <span className="admin-surface-eyebrow">Selected Folder</span>
+                <h3>{activeFolder.user.name}</h3>
+                <p>{activeFolder.user.email}</p>
+              </div>
 
-            return (
-              <article className="panel" key={document._id}>
-                <div className="list-item stretch">
-                  <div>
-                    <strong>{document.title}</strong>
-                    <p>
-                      For {document.user?.name || 'Unknown user'} | {document.serviceType}
-                    </p>
-                    <small>
-                      Sent by {senderName} | Uploaded {formatDate(document.createdAt)}
-                    </small>
-                    {document.fileUrl ? (
-                      <a className="text-link" href={document.fileUrl} rel="noreferrer" target="_blank">
-                        Open attachment
-                      </a>
-                    ) : null}
-                  </div>
-                  <StatusBadge status={document.status} />
-                </div>
+              <div className="admin-folder-filter-row">
+                <div className="admin-folder-summary-pill">{activeFolder.totalFiles} total files</div>
+                <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
+                  <option value="all">All Documents</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
 
-                <div className="inline-form">
-                  <select
-                    onChange={(event) => updateReviewField(document._id, 'status', event.target.value)}
-                    value={currentReview.status}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="verified">Verified</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
-                  <input
-                    onChange={(event) => updateReviewField(document._id, 'remarks', event.target.value)}
-                    placeholder="Add remarks"
-                    type="text"
-                    value={currentReview.remarks}
-                  />
-                  <button className="button button-primary" onClick={() => submitReview(document._id)} type="button">
-                    Save
-                  </button>
-                </div>
+            <div className="admin-preview-metric-grid">
+              <article className="admin-preview-metric">
+                <span>Total Files</span>
+                <strong>{activeFolder.totalFiles}</strong>
               </article>
-            )
-          })}
-        </div>
-      ) : (
-        <EmptyState description="Client uploads and shared documents will appear here." title="No documents to review" />
-      )}
+              <article className="admin-preview-metric">
+                <span>Pending</span>
+                <strong>{activeFolder.pendingCount}</strong>
+              </article>
+              <article className="admin-preview-metric">
+                <span>Approved</span>
+                <strong>{activeFolder.approvedCount}</strong>
+              </article>
+              <article className="admin-preview-metric">
+                <span>Last Upload</span>
+                <strong>{activeFolder.lastUploadDate ? formatDate(activeFolder.lastUploadDate) : 'N/A'}</strong>
+              </article>
+            </div>
+
+            {activeDocuments.length ? (
+              <div className="admin-folder-file-list">
+                {activeDocuments.map((document) => (
+                  <article className="admin-folder-file-row" key={document._id}>
+                    <div>
+                      <div className="admin-record-title-row">
+                        <strong>{document.documentType || document.title}</strong>
+                        <StatusBadge status={document.status} />
+                      </div>
+                      <p>{document.originalName || document.filename}</p>
+                      <div className="admin-meta-row">
+                        <span>Service: {document.serviceType}</span>
+                        <span>Uploaded: {formatDateTime(document.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="admin-record-actions">
+                      <button
+                        className="button button-primary button-compact"
+                        disabled={downloadingId === document._id}
+                        onClick={() => handleDownload(document)}
+                        type="button"
+                      >
+                        {downloadingId === document._id ? 'Downloading...' : 'Download'}
+                      </button>
+                      {document.fileUrl ? (
+                        <a className="button button-ghost button-compact" href={document.fileUrl} rel="noreferrer" target="_blank">
+                          Preview
+                        </a>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                description={
+                  statusFilter === 'all'
+                    ? 'This client has not uploaded any documents yet.'
+                    : `No ${statusFilter} documents were found in this folder.`
+                }
+                title="No files to show"
+              />
+            )}
+          </>
+        ) : (
+          <EmptyState
+            description="User-wise folders will appear here automatically as soon as clients start uploading service documents."
+            title="No folders yet"
+          />
+        )}
+      </section>
     </div>
   )
 }

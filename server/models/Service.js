@@ -7,10 +7,29 @@ const serviceSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    requestedByClient: {
+      type: Boolean,
+      default: false,
+    },
+    catalogService: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ServiceCatalog',
+      default: null,
+    },
     type: {
       type: String,
       required: true,
       trim: true,
+    },
+    description: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    price: {
+      type: Number,
+      min: 0,
+      default: 0,
     },
     status: {
       type: String,
@@ -29,6 +48,10 @@ const serviceSchema = new mongoose.Schema(
     adminRemarks: {
       type: String,
       default: '',
+    },
+    completedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

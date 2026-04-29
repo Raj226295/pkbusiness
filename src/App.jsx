@@ -12,18 +12,20 @@ import Login from './pages/public/Login.jsx'
 import Register from './pages/public/Register.jsx'
 import NotFound from './pages/public/NotFound.jsx'
 import Dashboard from './pages/dashboard/Dashboard.jsx'
-import Documents from './pages/dashboard/Documents.jsx'
+import UploadDocuments from './pages/dashboard/UploadDocuments.jsx'
+import MyDocuments from './pages/dashboard/Documents.jsx'
 import Appointments from './pages/dashboard/Appointments.jsx'
 import DashboardServices from './pages/dashboard/Services.jsx'
 import Payments from './pages/dashboard/Payments.jsx'
-import Notifications from './pages/dashboard/Notifications.jsx'
+import Messages from './pages/dashboard/Notifications.jsx'
 import Profile from './pages/dashboard/Profile.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
-import AdminUsers from './pages/admin/Users.jsx'
 import AdminDocuments from './pages/admin/Documents.jsx'
+import AdminMessages from './pages/admin/Messages.jsx'
 import AdminServices from './pages/admin/Services.jsx'
 import AdminAppointments from './pages/admin/Appointments.jsx'
 import AdminPayments from './pages/admin/Payments.jsx'
+import AdminClientWorkspace from './pages/admin/ClientWorkspace.jsx'
 
 function App() {
   return (
@@ -49,11 +51,14 @@ function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="documents" element={<Documents />} />
+          <Route path="documents" element={<Navigate replace to="/dashboard/my-documents" />} />
+          <Route path="upload-documents" element={<UploadDocuments />} />
+          <Route path="my-documents" element={<MyDocuments />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="services" element={<DashboardServices />} />
           <Route path="payments" element={<Payments />} />
-          <Route path="notifications" element={<Notifications />} />
+          <Route path="notifications" element={<Navigate replace to="/dashboard/messages" />} />
+          <Route path="messages" element={<Messages />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
@@ -66,8 +71,16 @@ function App() {
           }
         >
           <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="documents" element={<AdminDocuments />} />
+          <Route path="users" element={<Navigate replace to="/admin" />} />
+          <Route path="clients/:userId" element={<AdminClientWorkspace section="overview" />} />
+          <Route path="clients/:userId/services" element={<AdminClientWorkspace section="services" />} />
+          <Route path="clients/:userId/services/:serviceKey" element={<AdminClientWorkspace section="service-detail" />} />
+          <Route path="clients/:userId/appointments" element={<AdminClientWorkspace section="appointments" />} />
+          <Route path="clients/:userId/payments" element={<AdminClientWorkspace section="payments" />} />
+          <Route path="clients/:userId/profile" element={<AdminClientWorkspace section="profile" />} />
+          <Route path="messages" element={<AdminMessages />} />
+          <Route path="documents" element={<Navigate replace to="/admin/folders" />} />
+          <Route path="folders" element={<AdminDocuments />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="payments" element={<AdminPayments />} />

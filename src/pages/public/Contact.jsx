@@ -84,20 +84,32 @@ function Contact() {
           <article className="panel">
             <h3>Visit our office</h3>
             <p>{siteContact.address}</p>
-            <p>Mon - Sat | 10:00 AM to 7:00 PM</p>
-            <a className="text-link" href="mailto:hello@svca.in">
-              hello@svca.in
+            <p>{siteContact.officeHours}</p>
+            <a className="text-link" href={`mailto:${siteContact.email}`}>
+              {siteContact.email}
+            </a>
+            <a className="text-link" href={siteContact.mapLink} rel="noreferrer" target="_blank">
+              Open in Google Maps
             </a>
           </article>
 
           <article className="panel map-panel">
-            <iframe
-              allowFullScreen=""
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps?q=${encodeURIComponent(siteContact.mapQuery)}&z=15&output=embed`}
-              title="Office map"
-            />
+            <a
+              aria-label="Open office location in Google Maps"
+              className="map-link-wrap"
+              href={siteContact.mapLink}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <iframe
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(siteContact.mapQuery)}&z=15&output=embed`}
+                title="Office map"
+              />
+              <span className="map-link-overlay">Tap to open in Google Maps</span>
+            </a>
           </article>
         </div>
       </section>

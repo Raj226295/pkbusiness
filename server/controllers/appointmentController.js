@@ -15,12 +15,13 @@ export const createAppointment = asyncHandler(async (req, res) => {
     user: req.user._id,
     scheduledFor,
     notes,
+    status: 'pending',
   })
 
   await createNotification({
     userId: req.user._id,
-    title: 'Appointment booked',
-    message: 'Your consultation request has been booked successfully.',
+    title: 'Appointment request submitted',
+    message: 'Your consultation request has been submitted for admin confirmation.',
   })
 
   await sendEmail({

@@ -6,7 +6,17 @@ export const siteBrand = {
 
 export const siteContact = {
   address: 'Zero Mile, near Hanuman Mandir, Gulabbagh, Purnia, Bihar 854326',
-  mapQuery: 'Zero Mile, near Hanuman Mandir, Gulabbagh, Purnia, Bihar 854326',
+  mapQuery: '25.7913078,87.542642',
+  mapLink: 'https://maps.app.goo.gl/RdDsDtmYVExtoWLd6?g_st=ac',
+  email: 'Pkbsa2022@gmail.com',
+  officeHours: 'Mon - Sun | 10:00 AM to 8:00 PM',
+}
+
+export const siteSocials = {
+  instagram: 'https://www.instagram.com/p.k_business_solution?igsh=MW02NTgxNjRhdzl4bQ==',
+  facebook: 'https://www.facebook.com/share/1DgMG6spNf/',
+  youtube: 'https://www.youtube.com/@PKBusinessSolution',
+  gmail: 'mailto:Pkbsa2022@gmail.com',
 }
 
 export const publicNavLinks = [
@@ -102,22 +112,109 @@ export const aboutWorkStyle = [
   'Timely coordination so important deadlines do not get missed.',
 ]
 
+export const aboutFounderProfile = {
+  name: 'Founder, PK Business Solution',
+  qualification: 'Tax & Business Compliance Professional',
+  experience: '5+ years of practical experience',
+  specialization: 'GST, Income Tax, registrations, and business consulting',
+  intro:
+    'Our firm is founder-led, with a strong focus on accurate filing, dependable communication, and practical support for individuals, professionals, and businesses.',
+}
+
+export const aboutMissionVision = [
+  {
+    label: 'Our Mission',
+    title: 'Transparent and efficient financial support for every client.',
+    description:
+      'To provide transparent, timely, and reliable tax and compliance services that help individuals and businesses stay organized, confident, and fully informed.',
+  },
+  {
+    label: 'Our Vision',
+    title: 'To become a trusted financial partner for clients across India.',
+    description:
+      'We aim to build long-term relationships through professional guidance, responsive service, and a strong commitment to accuracy in every engagement.',
+  },
+]
+
+export const aboutServicesOverview = [
+  {
+    title: 'GST Registration & Filing',
+    description:
+      'Registration, return filing, and routine GST support for growing businesses that need timely compliance.',
+  },
+  {
+    title: 'Income Tax Return (ITR)',
+    description:
+      'Professional ITR preparation and filing support for salaried individuals, business owners, and professionals.',
+  },
+  {
+    title: 'Company Registration',
+    description:
+      'Structured guidance for business setup, registration documentation, and early compliance requirements.',
+  },
+  {
+    title: 'Audit & Assurance',
+    description:
+      'Practical audit support with process clarity, document readiness, and attention to reporting standards.',
+  },
+  {
+    title: 'Financial Planning',
+    description:
+      'Clear financial guidance to help clients make informed decisions around tax planning and business operations.',
+  },
+]
+
+export const aboutWhyChooseUs = [
+  {
+    title: 'Expert Professionals',
+    description:
+      'You get support shaped by hands-on experience in tax, compliance, and business documentation.',
+  },
+  {
+    title: 'Fast & Secure Service',
+    description:
+      'We work with clear timelines and an organized process that keeps documents and updates under control.',
+  },
+  {
+    title: 'Affordable Pricing',
+    description:
+      'Professional support is delivered with value-conscious service suited for individuals and businesses.',
+  },
+  {
+    title: 'Responsive Support',
+    description:
+      'Questions and follow-ups are handled with a client-first approach so you are never left guessing.',
+  },
+  {
+    title: '100% Transparency',
+    description:
+      'We keep communication simple, expectations clear, and every step easy to understand.',
+  },
+]
+
+export const aboutStats = [
+  { value: '500+', label: 'Clients served' },
+  { value: '1000+', label: 'ITR filings completed' },
+  { value: '5+', label: 'Years of experience' },
+  { value: '99%', label: 'Client satisfaction focus' },
+]
+
 export const dashboardLinks = [
   { label: 'Overview', to: '/dashboard', end: true },
-  { label: 'Documents', to: '/dashboard/documents' },
-  { label: 'Appointments', to: '/dashboard/appointments' },
+  { label: 'Upload Documents', to: '/dashboard/upload-documents' },
+  { label: 'My Documents', to: '/dashboard/my-documents' },
   { label: 'Services', to: '/dashboard/services' },
   { label: 'Payments', to: '/dashboard/payments' },
-  { label: 'Notifications', to: '/dashboard/notifications' },
+  { label: 'Appointments', to: '/dashboard/appointments' },
+  { label: 'Messages', to: '/dashboard/messages' },
   { label: 'Profile', to: '/dashboard/profile' },
 ]
 
 export const adminLinks = [
-  { label: 'Overview', to: '/admin', end: true },
-  { label: 'Users', to: '/admin/users' },
-  { label: 'Documents', to: '/admin/documents' },
-  { label: 'Services', to: '/admin/services' },
-  { label: 'Appointments', to: '/admin/appointments' },
-  { label: 'Payments', to: '/admin/payments' },
-  { label: 'Profile', to: '/admin/profile' },
+  { label: 'Overview', to: '/admin', end: true, icon: 'overview' },
+  { label: 'Message', to: '/admin/messages', icon: 'message' },
+  { label: 'My Folder', to: '/admin/folders', icon: 'folder' },
+  { label: 'Appointment', to: '/admin/appointments', icon: 'appointment' },
+  { label: 'Profile', to: '/admin/profile', icon: 'profile' },
+  { label: 'Services', to: '/admin/services', icon: 'services' },
 ]

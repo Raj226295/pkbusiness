@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import homeHeroPoster from '../../assets/home-hero-poster.jpg'
+import homeHeroProfile from '../../assets/home-hero-profile.jpg'
 import { serviceCatalog, testimonials } from '../../data/siteData.js'
 
 function Home() {
@@ -7,11 +7,11 @@ function Home() {
     <div className="page-stack">
       <section className="hero-section home-hero-section container">
         <div className="hero-copy home-hero-copy">
-          <span className="eyebrow">Trusted business partner</span>
-          <h1>ITR, GST, and business compliance support that keeps you one step ahead.</h1>
+          <span className="eyebrow">Professional business support</span>
+          <h1>Tax, GST, and registration guidance presented with clarity, speed, and trust.</h1>
           <p>
-            We help professionals, families, shop owners, and growing businesses manage tax filing,
-            registrations, and routine compliance with clarity, speed, and personal attention.
+            We help professionals, families, and growing businesses handle tax filing,
+            registrations, and ongoing compliance with a more organized and dependable process.
           </p>
           <div className="hero-actions">
             <Link className="button button-primary" to="/contact">
@@ -20,6 +20,11 @@ function Home() {
             <Link className="button button-ghost" to="/services">
               Explore Services
             </Link>
+          </div>
+          <div className="hero-service-strip">
+            <span>ITR Filing</span>
+            <span>GST Registration</span>
+            <span>Udyam Support</span>
           </div>
           <div className="hero-stats">
             <div>
@@ -37,21 +42,14 @@ function Home() {
           </div>
         </div>
 
-        <div className="hero-panel home-hero-panel">
-          <div className="home-hero-media">
-            <img alt="PK Business service poster" src={homeHeroPoster} />
+        <div className="home-hero-visual">
+          <div className="home-hero-figure">
+            <img alt="PK Business professional reviewing business documents" src={homeHeroProfile} />
           </div>
-          <span className="panel-chip">Purnia & Beyond</span>
-          <h3>Practical support for tax filing, GST registration, and Udyam documentation.</h3>
-          <p>
-            Clear advice, organized paperwork, and dependable follow-through for clients who want a
-            smoother compliance experience.
-          </p>
-          <ul className="bullet-list">
-            <li>Dedicated support for ITR filing, GST work, and Udyam registration</li>
-            <li>Simple document collection with fast coordination on active tasks</li>
-            <li>Consultation and follow-up support that stays easy to understand</li>
-          </ul>
+          <div className="home-hero-caption">
+            <strong>Purnia & Beyond</strong>
+            <span>Reliable assistance for filings, registrations, and document-ready compliance work.</span>
+          </div>
         </div>
       </section>
 

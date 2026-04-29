@@ -1,16 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
 import api, { extractApiError } from '../../lib/api.js'
-import { formatDate } from '../../lib/formatters.js'
+import { formatDateTime } from '../../lib/formatters.js'
+
+function categoryLabel(category = 'general') {
+  const normalized = String(category).toLowerCase()
+
+  if (normalized === 'response') return 'Admin Reply'
+  if (normalized === 'payment') return 'Payment'
+  if (normalized === 'appointment') return 'Appointment'
+  if (normalized === 'service') return 'Service'
+  if (normalized === 'document') return 'Document'
+  if (normalized === 'security') return 'Security'
+
+  return 'General'
+}
 
 function Notifications() {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState({ type: '', message: '' })
   const navigate = useNavigate()
+
+  const summary = useMemo(() => {
+    return {
+      total: notifications.length,
+      unread: notifications.filter((notification) => !notification.read).length,
+      adminReplies: notifications.filter((notification) => notification.category === 'response').length,
+    }
+  }, [notifications])
 
   const loadNotifications = async () => {
     const { data } = await api.get('/api/notifications')
@@ -79,10 +100,28 @@ function Notifications() {
             </button>
           ) : null
         }
-        description="View alerts for uploaded documents, service updates, payments, and appointments."
-        eyebrow="Notifications"
-        title="Activity Feed"
+        description="Read admin replies, document review updates, payment verification messages, and request responses from one place."
+        eyebrow="Messages"
+        title="Messages & Responses"
       />
+
+      <section className="card-grid three-up">
+        <article className="panel admin-summary-panel">
+          <span className="eyebrow">Total</span>
+          <h3>All notifications</h3>
+          <p className="hero-number">{summary.total}</p>
+        </article>
+        <article className="panel admin-summary-panel">
+          <span className="eyebrow">Unread</span>
+          <h3>Pending reads</h3>
+          <p className="hero-number">{summary.unread}</p>
+        </article>
+        <article className="panel admin-summary-panel">
+          <span className="eyebrow">Replies</span>
+          <h3>Admin messages</h3>
+          <p className="hero-number">{summary.adminReplies}</p>
+        </article>
+      </section>
 
       {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
 
@@ -98,6 +137,7 @@ function Notifications() {
                   <div className="notification-head">
                     {!notification.read ? <span className="notification-dot" aria-label="Unread notification" /> : null}
                     <strong>{notification.title}</strong>
+                    <span className="status-badge neutral">{categoryLabel(notification.category)}</span>
                   </div>
                   <p>{notification.message}</p>
                   {notification.actionLabel || notification.fileUrl || notification.link ? (
@@ -110,15 +150,13 @@ function Notifications() {
                     </button>
                   ) : null}
                 </div>
-                <span className="list-meta">
-                  {formatDate(notification.createdAt, { dateStyle: 'medium', timeStyle: 'short' })}
-                </span>
+                <span className="list-meta">{formatDateTime(notification.createdAt)}</span>
               </div>
             </article>
           ))}
         </div>
       ) : (
-        <EmptyState description="You are all caught up for now." title="No notifications available" />
+        <EmptyState description="Admin replies and system responses will appear here." title="No messages available" />
       )}
     </div>
   )

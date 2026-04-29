@@ -15,10 +15,14 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    adminNotes: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
-      enum: ['scheduled', 'confirmed', 'completed', 'cancelled'],
-      default: 'scheduled',
+      enum: ['pending', 'scheduled', 'confirmed', 'completed', 'cancelled', 'rejected'],
+      default: 'pending',
     },
   },
   {

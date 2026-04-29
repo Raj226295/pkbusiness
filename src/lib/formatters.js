@@ -9,6 +9,18 @@ export function formatDate(value, options = {}) {
   }).format(new Date(value))
 }
 
+export function formatDateTime(value, options = {}) {
+  if (!value) {
+    return 'Not available'
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    ...options,
+  }).format(new Date(value))
+}
+
 export function formatCurrency(value = 0) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

@@ -19,12 +19,27 @@ function getRazorpayClient() {
   })
 }
 
+function buildUploadUrl(req, file) {
+  if (!file?.filename) {
+    return ''
+  }
+
+  return `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+}
+
 export const createPayment = asyncHandler(async (req, res) => {
-  const { serviceType, amount, description } = req.body
+  const { serviceType, description } = req.body
+  const amount = Number(req.body.amount)
+  const paymentMethod = req.body.paymentMethod === 'manual' ? 'manual' : 'online'
 
   if (!serviceType || !amount) {
     res.status(400)
     throw new Error('Service type and amount are required')
+  }
+
+  if (paymentMethod === 'manual' && !req.file) {
+    res.status(400)
+    throw new Error('Please upload a payment screenshot for manual verification')
   }
 
   const payment = await Payment.create({
@@ -33,12 +48,15 @@ export const createPayment = asyncHandler(async (req, res) => {
     serviceType,
     description,
     amount,
+    paymentMethod,
+    screenshotUrl: buildUploadUrl(req, req.file),
+    screenshotName: req.file?.originalname || '',
   })
 
   let checkout = { enabled: false }
   const razorpay = getRazorpayClient()
 
-  if (razorpay) {
+  if (paymentMethod === 'online' && razorpay) {
     const order = await razorpay.orders.create({
       amount: Math.round(Number(amount) * 100),
       currency: 'INR',
@@ -66,7 +84,10 @@ export const createPayment = asyncHandler(async (req, res) => {
   await createNotification({
     userId: req.user._id,
     title: 'Invoice generated',
-    message: `${payment.invoiceNumber} has been created for ${serviceType}.`,
+    message:
+      paymentMethod === 'manual'
+        ? `${payment.invoiceNumber} has been submitted for manual payment verification.`
+        : `${payment.invoiceNumber} has been created for ${serviceType}.`,
   })
 
   res.status(201).json({
@@ -102,10 +123,12 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   }
 
   payment.status = 'paid'
+  payment.verificationStatus = 'verified'
   payment.transactionId = razorpay_payment_id
   payment.razorpayOrderId = razorpay_order_id
   payment.razorpayPaymentId = razorpay_payment_id
   payment.paidAt = new Date()
+  payment.verifiedAt = new Date()
   await payment.save()
 
   await createNotification({

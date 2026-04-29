@@ -30,6 +30,24 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    profileImageZoom: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 2.5,
+    },
+    profileImageOffsetX: {
+      type: Number,
+      default: 0,
+      min: -35,
+      max: 35,
+    },
+    profileImageOffsetY: {
+      type: Number,
+      default: 0,
+      min: -35,
+      max: 35,
+    },
     isBlocked: {
       type: Boolean,
       default: false,
