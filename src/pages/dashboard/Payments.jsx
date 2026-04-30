@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import PageHeader from '../../components/common/PageHeader.jsx'
-import StatusBadge from '../../components/common/StatusBadge.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import PageHeader from '../../components/common/PageHeader.jsx'
+import StatusBadge from '../../components/common/StatusBadge.jsx'
 import { siteBrand } from '../../data/siteData.js'
 import api, { extractApiError } from '../../lib/api.js'
 import { formatCurrency, formatDate, formatDateTime } from '../../lib/formatters.js'
+import { getServicePaymentEligibility } from '../../lib/paymentEligibility.js'
 
 const initialForm = {
-  catalogServiceId: '',
-  serviceType: '',
-  amount: 0,
+  serviceId: '',
   description: '',
   paymentMethod: 'online',
+  transactionId: '',
 }
 
 function loadRazorpayScript() {
@@ -30,10 +30,74 @@ function loadRazorpayScript() {
   })
 }
 
+function getStageTitle(stage) {
+  switch (stage) {
+    case 'service_completed':
+      return 'Service completed'
+    case 'service_rejected':
+      return 'Service rejected'
+    case 'service_in_progress':
+      return 'Work in progress'
+    case 'ready':
+      return 'Payment ready'
+    case 'retry':
+      return 'Retry payment'
+    case 'under_review':
+      return 'Payment under review'
+    case 'approved':
+      return 'Payment approved'
+    case 'review_pending':
+      return 'Waiting for document review'
+    case 'reupload_required':
+      return 'Upload corrected documents'
+    case 'awaiting_price':
+      return 'Waiting for admin price'
+    case 'service_pending_approval':
+      return 'Waiting for service approval'
+    case 'upload_documents':
+      return 'Upload documents first'
+    default:
+      return 'Waiting for next step'
+  }
+}
+
+function getStageMessage(state) {
+  switch (state.stage) {
+    case 'service_completed':
+      return 'Admin has already marked this service as completed.'
+    case 'service_rejected':
+      return 'Admin rejected this service. Please check the remark on the service card or contact admin.'
+    case 'service_in_progress':
+      return 'Your payment is verified and the admin team is now working on this service.'
+    case 'ready':
+      return 'Admin has reviewed your documents and set the service price. You can pay now.'
+    case 'retry':
+      return state.latestPayment?.reviewRemarks
+        ? `Last payment was rejected: ${state.latestPayment.reviewRemarks}`
+        : 'Your earlier payment was rejected. Upload a fresh proof or pay again.'
+    case 'under_review':
+      return 'Your payment request is already with admin for screenshot and transaction verification.'
+    case 'approved':
+      return 'Payment has already been approved for this service.'
+    case 'review_pending':
+      return 'Admin is still checking your uploaded documents. Payment will open after review.'
+    case 'reupload_required':
+      return 'At least one document was rejected. Please re-upload the corrected file first.'
+    case 'awaiting_price':
+      return 'Documents are reviewed. Admin still needs to set the final service price.'
+    case 'service_pending_approval':
+      return 'Admin will first approve this service, then payment will open after review and pricing.'
+    case 'upload_documents':
+      return 'Upload the required service documents first, then admin can review them.'
+    default:
+      return 'This service is not ready for payment yet.'
+  }
+}
+
 function Payments() {
   const [payments, setPayments] = useState([])
-  const [catalog, setCatalog] = useState([])
   const [services, setServices] = useState([])
+  const [documents, setDocuments] = useState([])
   const [form, setForm] = useState(initialForm)
   const [proofFile, setProofFile] = useState(null)
   const [fileInputKey, setFileInputKey] = useState(0)
@@ -42,31 +106,32 @@ function Payments() {
   const [status, setStatus] = useState({ type: '', message: '' })
   const location = useLocation()
 
-  const selectableServices = useMemo(() => {
-    const activeRequestedServices = services
-      .filter((service) => ['pending', 'in progress'].includes(service.status))
-      .map((service) => ({
-        key: service.catalogService?._id || service._id,
-        name: service.type,
-        description: service.description || service.notes || '',
-        price: service.price || service.catalogService?.price || 0,
-      }))
+  const serviceStates = useMemo(
+    () =>
+      services.map((service) => ({
+        service,
+        eligibility: getServicePaymentEligibility({
+          service,
+          documents,
+          payments,
+        }),
+      })),
+    [documents, payments, services],
+  )
 
-    if (activeRequestedServices.length) {
-      return activeRequestedServices
-    }
-
-    return catalog.map((service) => ({
-      key: service._id,
-      name: service.name,
-      description: service.description || '',
-      price: service.price || 0,
-    }))
-  }, [catalog, services])
+  const selectableServices = useMemo(
+    () => serviceStates.filter((item) => item.eligibility.isReadyForPayment).map((item) => item.service),
+    [serviceStates],
+  )
 
   const selectedService = useMemo(
-    () => selectableServices.find((item) => item.key === form.catalogServiceId) || selectableServices[0] || null,
-    [selectableServices, form.catalogServiceId],
+    () => selectableServices.find((service) => service._id === form.serviceId) || selectableServices[0] || null,
+    [form.serviceId, selectableServices],
+  )
+
+  const selectedServiceState = useMemo(
+    () => serviceStates.find((item) => item.service._id === selectedService?._id) || null,
+    [selectedService?._id, serviceStates],
   )
 
   const summary = useMemo(() => {
@@ -81,22 +146,20 @@ function Payments() {
       totalPaid: payments
         .filter((payment) => payment.status === 'paid')
         .reduce((total, payment) => total + Number(payment.amount || 0), 0),
+      readyToPay: selectableServices.length,
     }
-  }, [payments])
+  }, [payments, selectableServices.length])
 
   const loadData = async () => {
-    const [paymentsRes, catalogRes, servicesRes] = await Promise.all([
+    const [paymentsRes, servicesRes, documentsRes] = await Promise.all([
       api.get('/api/payments'),
-      api.get('/api/services/catalog'),
       api.get('/api/services'),
+      api.get('/api/documents'),
     ])
 
-    const catalogServices = catalogRes.data.services || []
-    const requestedServices = servicesRes.data.services || []
-
-    setPayments(paymentsRes.data.payments)
-    setCatalog(catalogServices)
-    setServices(requestedServices)
+    setPayments(paymentsRes.data.payments || [])
+    setServices(servicesRes.data.services || [])
+    setDocuments(documentsRes.data.documents || [])
   }
 
   useEffect(() => {
@@ -111,17 +174,19 @@ function Payments() {
 
   useEffect(() => {
     if (!selectableServices.length) {
+      setForm((current) => ({
+        ...current,
+        serviceId: '',
+      }))
       return
     }
 
     const preferredId =
-      location.state?.catalogServiceId &&
-      selectableServices.some((item) => item.key === location.state.catalogServiceId)
-        ? location.state.catalogServiceId
-        : form.catalogServiceId
+      location.state?.serviceId && selectableServices.some((service) => service._id === location.state.serviceId)
+        ? location.state.serviceId
+        : form.serviceId
 
-    const nextService =
-      selectableServices.find((item) => item.key === preferredId) || selectableServices[0]
+    const nextService = selectableServices.find((service) => service._id === preferredId) || selectableServices[0]
 
     if (!nextService) {
       return
@@ -129,25 +194,17 @@ function Payments() {
 
     setForm((current) => ({
       ...current,
-      catalogServiceId: nextService.key,
-      serviceType: nextService.name,
-      amount: nextService.price,
-      description: current.description || nextService.description || '',
+      serviceId: nextService._id,
     }))
-  }, [form.catalogServiceId, location.state?.catalogServiceId, selectableServices])
+  }, [form.serviceId, location.state?.serviceId, selectableServices])
 
   const handleChange = (event) => {
     const { name, value, files } = event.target
 
-    if (name === 'catalogServiceId') {
-      const nextService = selectableServices.find((item) => item.key === value)
-
+    if (name === 'serviceId') {
       setForm((current) => ({
         ...current,
-        catalogServiceId: value,
-        serviceType: nextService?.name || '',
-        amount: nextService?.price || 0,
-        description: nextService?.description || '',
+        serviceId: value,
       }))
       return
     }
@@ -171,7 +228,7 @@ function Payments() {
         type: 'success',
         message:
           response.payment.paymentMethod === 'manual'
-            ? 'Manual payment proof submitted successfully.'
+            ? 'Payment proof submitted successfully. Admin will verify it shortly.'
             : 'Invoice created. Add Razorpay keys to enable online checkout automatically.',
       })
       return
@@ -211,11 +268,13 @@ function Payments() {
     setStatus({ type: '', message: '' })
 
     const payload = new FormData()
-    payload.append('catalogServiceId', form.catalogServiceId)
-    payload.append('serviceType', form.serviceType)
-    payload.append('amount', String(form.amount))
+    payload.append('serviceId', form.serviceId)
     payload.append('description', form.description)
     payload.append('paymentMethod', form.paymentMethod)
+
+    if (form.paymentMethod === 'manual') {
+      payload.append('transactionId', form.transactionId)
+    }
 
     if (proofFile) {
       payload.append('screenshot', proofFile)
@@ -228,6 +287,10 @@ function Payments() {
         },
       })
       await loadData()
+      setForm((current) => ({
+        ...initialForm,
+        serviceId: current.serviceId,
+      }))
       setProofFile(null)
       setFileInputKey((current) => current + 1)
       await openCheckout(data)
@@ -245,72 +308,113 @@ function Payments() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="See the selected service and fixed price, pay online, or upload a screenshot for manual verification."
+        description="Pay only after admin approves the service, reviews your documents, and sets the final service price. Manual payments need screenshot and transaction reference."
         eyebrow="Payments"
         title="Payments & Verification"
       />
 
       <section className="card-grid two-up">
-        <form className="panel form-panel" onSubmit={handleSubmit}>
-          <h3>Pay for selected service</h3>
-          <label>
-            Selected service
-            <select name="catalogServiceId" onChange={handleChange} value={form.catalogServiceId}>
-              {selectableServices.map((item) => (
-                <option key={item.key} value={item.key}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <section className="panel form-panel">
+          {selectableServices.length ? (
+            <form onSubmit={handleSubmit}>
+              <h3>Pay for approved service</h3>
+              <label>
+                Selected service
+                <select name="serviceId" onChange={handleChange} value={form.serviceId}>
+                  {selectableServices.map((service) => (
+                    <option key={service._id} value={service._id}>
+                      {service.type}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          {selectedService ? (
-            <div className="service-catalog-preview">
-              <strong>{selectedService.name}</strong>
-              <p>{selectedService.description}</p>
-              <span>{formatCurrency(selectedService.price)}</span>
-            </div>
-          ) : null}
+              {selectedService ? (
+                <div className="service-catalog-preview">
+                  <strong>{selectedService.type}</strong>
+                  <p>{selectedService.description || selectedService.adminRemarks || 'Admin has reviewed this service and opened payment.'}</p>
+                  <span>{formatCurrency(selectedService.price || 0)}</span>
+                </div>
+              ) : null}
 
-          <label>
-            Amount
-            <input disabled min="1" name="amount" type="number" value={form.amount} />
-          </label>
-          <label>
-            Message
-            <textarea name="description" onChange={handleChange} rows="4" value={form.description} />
-          </label>
-          <label>
-            Payment mode
-            <select name="paymentMethod" onChange={handleChange} value={form.paymentMethod}>
-              <option value="online">Pay Now (Gateway)</option>
-              <option value="manual">Upload Payment Screenshot</option>
-            </select>
-          </label>
-          {form.paymentMethod === 'manual' ? (
-            <label>
-              Payment screenshot
-              <input
-                accept="image/*,.pdf"
-                key={fileInputKey}
-                name="screenshot"
-                onChange={handleChange}
-                required
-                type="file"
+              {selectedServiceState?.eligibility.latestRejectedPayment ? (
+                <p className="form-message error">
+                  {getStageMessage(selectedServiceState.eligibility)}
+                </p>
+              ) : null}
+
+              <label>
+                Amount
+                <input disabled min="1" type="number" value={selectedService?.price || 0} />
+              </label>
+              <label>
+                Message
+                <textarea
+                  name="description"
+                  onChange={handleChange}
+                  placeholder="Optional note for admin"
+                  rows="4"
+                  value={form.description}
+                />
+              </label>
+              <label>
+                Payment mode
+                <select name="paymentMethod" onChange={handleChange} value={form.paymentMethod}>
+                  <option value="online">Pay Now (Gateway)</option>
+                  <option value="manual">Upload Payment Screenshot</option>
+                </select>
+              </label>
+              {form.paymentMethod === 'manual' ? (
+                <>
+                  <label>
+                    Transaction ID / UPI reference
+                    <input
+                      name="transactionId"
+                      onChange={handleChange}
+                      placeholder="Enter transaction reference"
+                      required
+                      type="text"
+                      value={form.transactionId}
+                    />
+                  </label>
+                  <label>
+                    Payment screenshot
+                    <input
+                      accept="image/*,.pdf"
+                      key={fileInputKey}
+                      name="screenshot"
+                      onChange={handleChange}
+                      required
+                      type="file"
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
+
+              <button className="button button-primary" disabled={submitting || !selectedService} type="submit">
+                {submitting
+                  ? 'Processing...'
+                  : form.paymentMethod === 'manual'
+                    ? 'Submit for Verification'
+                    : 'Pay Now'}
+              </button>
+            </form>
+          ) : (
+            <div>
+              <h3>No payment ready yet</h3>
+              <p>
+                Payment box tabhi dikhega jab admin service approve karke document review aur pricing complete karega.
+              </p>
+              <EmptyState
+                description="Upload documents, wait for admin approval and review, and come back here once payment opens for your service."
+                title="Nothing to pay right now"
               />
-            </label>
-          ) : null}
-
-          {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
-
-          <button className="button button-primary" disabled={submitting || !selectableServices.length} type="submit">
-            {submitting
-              ? 'Processing...'
-              : form.paymentMethod === 'manual'
-                ? 'Submit for Verification'
-                : 'Pay Now'}
-          </button>
-        </form>
+              {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
+            </div>
+          )}
+        </section>
 
         <article className="panel document-summary-panel">
           <h3>Payment summary</h3>
@@ -321,22 +425,46 @@ function Payments() {
             </div>
             <div className="document-stat-tile">
               <strong>{summary.pending}</strong>
-              <span>Pending checks</span>
+              <span>Under review</span>
             </div>
             <div className="document-stat-tile">
               <strong>{summary.verified}</strong>
               <span>Verified / paid</span>
             </div>
             <div className="document-stat-tile">
+              <strong>{summary.readyToPay}</strong>
+              <span>Ready to pay</span>
+            </div>
+            <div className="document-stat-tile">
               <strong>{formatCurrency(summary.totalPaid)}</strong>
               <span>Total paid</span>
             </div>
           </div>
-          <ul className="bullet-list">
-            <li>Gateway payments can be completed instantly from the pay button.</li>
-            <li>Manual screenshot payments stay pending until admin verifies them.</li>
-            <li>If payment is rejected, the admin remark will appear in the history below.</li>
-          </ul>
+
+          {serviceStates.length ? (
+            <div className="list-stack">
+              {serviceStates.map(({ service, eligibility }) => (
+                <div className="card-inline" key={service._id}>
+                  <div className="list-item stretch">
+                    <div>
+                      <strong>{service.type}</strong>
+                      <p>{getStageTitle(eligibility.stage)}</p>
+                      <small>{getStageMessage(eligibility)}</small>
+                    </div>
+                  <div className="list-meta-group">
+                      <span>{service.price ? formatCurrency(service.price) : 'Price pending'}</span>
+                      <StatusBadge status={service.status} />
+                      {eligibility.latestPayment ? (
+                        <StatusBadge status={eligibility.latestPayment.verificationStatus || eligibility.latestPayment.status} />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No services found in your dashboard yet.</p>
+          )}
         </article>
       </section>
 

@@ -45,7 +45,7 @@ function App() {
         <Route
           path="dashboard"
           element={
-            <ProtectedRoute allowedRoles={['user', 'admin']}>
+            <ProtectedRoute allowedRoles={['user']}>
               <DashboardLayout role="user" />
             </ProtectedRoute>
           }
@@ -81,6 +81,7 @@ function App() {
           <Route path="messages" element={<AdminMessages />} />
           <Route path="documents" element={<Navigate replace to="/admin/folders" />} />
           <Route path="folders" element={<AdminDocuments />} />
+          <Route path="folders/:userId" element={<AdminDocuments />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="payments" element={<AdminPayments />} />

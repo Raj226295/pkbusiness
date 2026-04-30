@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import UserAvatar from '../common/UserAvatar.jsx'
@@ -39,13 +39,19 @@ function getWorkspaceTitle(pathname) {
     return 'CLIENT PREVIEW'
   }
 
+  if (pathname.startsWith('/admin/folders/')) {
+    return 'MY FOLDER'
+  }
+
   return 'Workspace'
 }
 
 function DashboardLayout({ role }) {
   const { user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const isAdminPanel = role === 'admin'
+  const profilePath = role === 'admin' ? '/admin/profile' : '/dashboard/profile'
 
   return (
     <div className={`dashboard-shell${isAdminPanel ? ' admin-shell' : ''}`}>
@@ -59,7 +65,11 @@ function DashboardLayout({ role }) {
               <p className="admin-topbar-subtitle">Client Workspace</p>
             ) : null}
           </div>
-          <div className={`user-pill${isAdminPanel ? ' admin-profile-pill' : ''}`}>
+          <button
+            className={`user-pill user-pill-button${isAdminPanel ? ' admin-profile-pill' : ''}`}
+            onClick={() => navigate(profilePath)}
+            type="button"
+          >
             <UserAvatar alt={`${user?.name || 'User'} profile image`} className="user-pill-avatar" user={user} />
             <div className="user-pill-copy">
               <strong>{user?.name}</strong>
@@ -70,7 +80,7 @@ function DashboardLayout({ role }) {
                 </span>
               </div>
             </div>
-          </div>
+          </button>
         </header>
 
         <main className="dashboard-main">

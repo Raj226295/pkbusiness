@@ -5,6 +5,22 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { siteBrand } from '../../data/siteData.js'
 import { extractApiError } from '../../lib/api.js'
 
+function getDefaultPathForRole(role) {
+  return role === 'admin' ? '/admin' : '/dashboard'
+}
+
+function getSafeRedirectPath(role, redirectTo = '') {
+  if (!redirectTo) {
+    return getDefaultPathForRole(role)
+  }
+
+  if (role === 'admin') {
+    return redirectTo.startsWith('/admin') ? redirectTo : '/admin'
+  }
+
+  return redirectTo.startsWith('/dashboard') ? redirectTo : '/dashboard'
+}
+
 function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -29,7 +45,7 @@ function Login() {
 
     try {
       const user = await login(form)
-      navigate(redirectTo || (user.role === 'admin' ? '/admin' : '/dashboard'))
+      navigate(getSafeRedirectPath(user.role, redirectTo), { replace: true })
     } catch (err) {
       setError(extractApiError(err))
     } finally {

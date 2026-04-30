@@ -95,6 +95,7 @@ function AdminClientWorkspace({ section = 'overview' }) {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isAvatarZoomOpen, setIsAvatarZoomOpen] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
   const [workingKey, setWorkingKey] = useState('')
   const [paymentDrafts, setPaymentDrafts] = useState({})
@@ -274,6 +275,19 @@ function AdminClientWorkspace({ section = 'overview' }) {
     }
   }
 
+  const handleProfileAvatarTap = () => {
+    if (section === 'profile') {
+      setIsAvatarZoomOpen(true)
+      return
+    }
+
+    navigate(`/admin/clients/${userId}/profile`)
+  }
+
+  const closeAvatarZoom = () => {
+    setIsAvatarZoomOpen(false)
+  }
+
   const renderOverviewSection = () => (
     <div className="admin-client-overview">
       <article className="admin-subpanel">
@@ -381,7 +395,7 @@ function AdminClientWorkspace({ section = 'overview' }) {
               <div className="admin-service-detail-actions">
                 <button
                   className="button button-primary button-compact"
-                  onClick={() => navigate(`/admin/folders?userId=${userId}`)}
+                  onClick={() => navigate(`/admin/folders/${userId}`)}
                   type="button"
                 >
                   Open in My Folder
@@ -532,7 +546,7 @@ function AdminClientWorkspace({ section = 'overview' }) {
                     }
                     value={draft.verificationStatus}
                   >
-                    <option value="pending">Pending</option>
+                    <option value="pending">Under review</option>
                     <option value="verified">Verified</option>
                     <option value="rejected">Rejected</option>
                   </select>
@@ -735,13 +749,20 @@ function AdminClientWorkspace({ section = 'overview' }) {
       <article className="admin-subpanel admin-client-profile-card">
         <div className="admin-client-profile-shell">
           <div className="admin-client-profile-hero">
-            <UserAvatar alt={`${user.name} profile`} className="admin-client-profile-avatar" user={user} />
+            <button
+              aria-label={section === 'profile' ? `Preview ${user.name} profile` : `Open ${user.name} profile`}
+              className="avatar-nav-button"
+              onClick={handleProfileAvatarTap}
+              type="button"
+            >
+              <UserAvatar alt={`${user.name} profile`} className="admin-client-profile-avatar" user={user} />
+            </button>
             <div className="admin-client-profile-copy">
               <span className="admin-surface-eyebrow">Client Profile</span>
               <h3>{user.name}</h3>
               <p>{user.email}</p>
               <div className="admin-client-profile-badges">
-                <StatusBadge status={user.isBlocked ? 'rejected' : 'approved'} />
+                {user.isBlocked ? <StatusBadge hiddenStatuses={[]} status="rejected" /> : null}
               </div>
             </div>
           </div>
@@ -783,12 +804,19 @@ function AdminClientWorkspace({ section = 'overview' }) {
 
       <section className="admin-preview-summary-row admin-client-workspace-hero">
         <article className="admin-preview-user-card admin-client-route-user-card">
-          <UserAvatar alt={`${user.name} profile`} className="admin-preview-avatar" user={user} />
+          <button
+            aria-label={section === 'profile' ? `Preview ${user.name} profile` : `Open ${user.name} profile`}
+            className="avatar-nav-button"
+            onClick={handleProfileAvatarTap}
+            type="button"
+          >
+            <UserAvatar alt={`${user.name} profile`} className="admin-preview-avatar" user={user} />
+          </button>
           <div className="admin-preview-user-copy">
             <strong>{user.name}</strong>
           </div>
           <div className="admin-preview-user-actions">
-            <StatusBadge status={user.isBlocked ? 'rejected' : 'approved'} />
+            {user.isBlocked ? <StatusBadge hiddenStatuses={[]} status="rejected" /> : null}
             <button
               className={`admin-grid-button ${user.isBlocked ? 'unblock' : 'block'}`}
               onClick={toggleUserBlock}
@@ -827,6 +855,31 @@ function AdminClientWorkspace({ section = 'overview' }) {
         {section === 'payments' ? renderPaymentsSection() : null}
         {section === 'profile' ? renderProfileSection() : null}
       </section>
+
+      {isAvatarZoomOpen ? (
+        <div
+          aria-modal="true"
+          className="avatar-lightbox-backdrop"
+          onClick={closeAvatarZoom}
+          role="dialog"
+        >
+          <div className="avatar-lightbox-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              aria-label="Close profile preview"
+              className="avatar-lightbox-close"
+              onClick={closeAvatarZoom}
+              type="button"
+            >
+              Close
+            </button>
+            <UserAvatar alt={`${user.name} enlarged profile`} className="avatar-lightbox-avatar" user={user} />
+            <div className="avatar-lightbox-copy">
+              <strong>{user.name}</strong>
+              <span>{user.email}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

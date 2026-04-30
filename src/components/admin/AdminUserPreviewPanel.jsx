@@ -182,7 +182,7 @@ function AdminUserPreviewPanel({
             <strong>{user.name}</strong>
           </div>
           <div className="admin-preview-user-actions">
-            <StatusBadge status={user.isBlocked ? 'rejected' : 'approved'} />
+            {user.isBlocked ? <StatusBadge hiddenStatuses={[]} status="rejected" /> : null}
             <button
               className={`admin-grid-button ${user.isBlocked ? 'unblock' : 'block'}`}
               onClick={() => onToggleBlock?.(user)}
@@ -340,7 +340,7 @@ function AdminUserPreviewPanel({
                           }
                           value={draft.status}
                         >
-                          <option value="pending">Pending</option>
+                          <option value="pending">Needs Review</option>
                           <option value="in progress">In Progress</option>
                           <option value="completed">Completed</option>
                         </select>
@@ -451,7 +451,7 @@ function AdminUserPreviewPanel({
                             }
                             value={draft.verificationStatus}
                           >
-                            <option value="pending">Pending</option>
+                            <option value="pending">Under review</option>
                             <option value="verified">Verified</option>
                             <option value="rejected">Rejected</option>
                           </select>
@@ -580,7 +580,7 @@ function AdminUserPreviewPanel({
                             }
                             value={draft.status}
                           >
-                            <option value="pending">Pending</option>
+                            <option value="pending">Awaiting</option>
                             <option value="confirmed">Confirmed</option>
                             <option value="completed">Completed</option>
                             <option value="rejected">Rejected</option>
@@ -685,7 +685,7 @@ function AdminUserPreviewPanel({
                             }
                             value={draft.status}
                           >
-                            <option value="pending">Pending</option>
+                            <option value="pending">Needs Review</option>
                             <option value="approved">Approved</option>
                             <option value="rejected">Rejected</option>
                           </select>

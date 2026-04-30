@@ -21,12 +21,31 @@ export function buildClientFolderName(user = {}) {
   return `${label}-${suffix}`
 }
 
-export async function moveUploadToClientFolder(file, user) {
+export function resolveClientDocumentFolderPath(user = {}) {
+  return path.join(documentsRoot, buildClientFolderName(user))
+}
+
+export async function ensureClientDocumentFolder(user) {
   await fs.mkdir(documentsRoot, { recursive: true })
 
   const folderName = buildClientFolderName(user)
-  const folderPath = path.join(documentsRoot, folderName)
+  const folderPath = resolveClientDocumentFolderPath(user)
   await fs.mkdir(folderPath, { recursive: true })
+
+  return {
+    folderName,
+    folderPath,
+    relativePath: path.relative(uploadsRoot, folderPath).replace(/\\/g, '/'),
+  }
+}
+
+export async function removeClientDocumentFolder(user) {
+  const folderPath = resolveClientDocumentFolderPath(user)
+  await fs.rm(folderPath, { recursive: true, force: true })
+}
+
+export async function moveUploadToClientFolder(file, user) {
+  const { folderName, folderPath } = await ensureClientDocumentFolder(user)
 
   const finalPath = path.join(folderPath, file.filename)
   await fs.rename(file.path, finalPath)

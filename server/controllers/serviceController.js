@@ -9,7 +9,7 @@ export const getUserServices = asyncHandler(async (req, res) => {
 })
 
 export const getServiceCatalogForUsers = asyncHandler(async (_req, res) => {
-  const services = await ServiceCatalog.find({ isActive: true }).sort({ sortOrder: 1, name: 1 })
+  const services = await ServiceCatalog.find({ isActive: true }).sort({ name: 1 })
   res.json({ services })
 })
 
@@ -31,7 +31,7 @@ export const requestService = asyncHandler(async (req, res) => {
   const existingActiveRequest = await Service.findOne({
     user: req.user._id,
     catalogService: catalogService._id,
-    status: { $in: ['pending', 'in progress'] },
+    status: { $in: ['pending', 'approved', 'in progress'] },
   })
 
   if (existingActiveRequest) {
@@ -45,7 +45,7 @@ export const requestService = asyncHandler(async (req, res) => {
     catalogService: catalogService._id,
     type: catalogService.name,
     description: catalogService.description,
-    price: catalogService.price,
+    price: 0,
     status: 'pending',
     priority: 'medium',
     notes: typeof notes === 'string' ? notes.trim() : '',
@@ -54,7 +54,7 @@ export const requestService = asyncHandler(async (req, res) => {
   await createNotification({
     userId: req.user._id,
     title: 'Service request submitted',
-    message: `${catalogService.name} has been added to your dashboard for admin review.`,
+    message: `${catalogService.name} has been added to your dashboard for admin review. Price will be shared after document verification.`,
     category: 'service',
     link: '/dashboard/services',
     actionLabel: 'View service',

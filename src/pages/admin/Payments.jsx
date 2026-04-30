@@ -115,7 +115,7 @@ function Payments() {
             </div>
             <div className="document-stat-tile">
               <strong>{summary.pending}</strong>
-              <span>Pending checks</span>
+              <span>Review queue</span>
             </div>
             <div className="document-stat-tile">
               <strong>{summary.verified}</strong>
@@ -134,7 +134,7 @@ function Payments() {
             Status
             <select onChange={(event) => handleFilterChange(event.target.value)} value={filter}>
               <option value="all">All payments</option>
-              <option value="pending">Pending</option>
+              <option value="pending">Under review</option>
               <option value="verified">Verified</option>
               <option value="rejected">Rejected</option>
               <option value="paid">Paid</option>
@@ -195,7 +195,7 @@ function Payments() {
                       onChange={(event) => updateField(payment, 'verificationStatus', event.target.value)}
                       value={draft.verificationStatus}
                     >
-                      <option value="pending">Pending</option>
+                      <option value="pending">Under review</option>
                       <option value="verified">Verified</option>
                       <option value="rejected">Rejected</option>
                     </select>

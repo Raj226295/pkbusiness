@@ -1,5 +1,6 @@
 import asyncHandler from '../middleware/asyncHandler.js'
 import User from '../models/User.js'
+import { ensureClientDocumentFolder } from '../utils/documentStorage.js'
 import { generateToken } from '../utils/generateToken.js'
 import { sendEmail } from '../utils/sendEmail.js'
 
@@ -40,6 +41,8 @@ export const registerUser = asyncHandler(async (req, res) => {
     phone,
     password,
   })
+
+  await ensureClientDocumentFolder(user)
 
   await sendEmail({
     to: user.email,

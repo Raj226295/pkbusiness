@@ -12,9 +12,24 @@ const toneMap = {
   cancelled: 'danger',
 }
 
-function StatusBadge({ status = 'pending' }) {
-  const normalized = status.toLowerCase()
-  const tone = toneMap[normalized.replace(/\s+/g, '')] || toneMap[normalized] || 'neutral'
+function normalizeStatusKey(value = '') {
+  return String(value).toLowerCase().replace(/\s+/g, '')
+}
+
+function StatusBadge({ status = 'pending', hiddenStatuses = ['pending'] }) {
+  if (!status) {
+    return null
+  }
+
+  const normalized = String(status).toLowerCase()
+  const normalizedKey = normalizeStatusKey(status)
+  const shouldHide = hiddenStatuses.some((item) => normalizeStatusKey(item) === normalizedKey)
+
+  if (shouldHide) {
+    return null
+  }
+
+  const tone = toneMap[normalizedKey] || toneMap[normalized] || 'neutral'
 
   return <span className={`status-badge ${tone}`}>{status}</span>
 }

@@ -345,7 +345,7 @@ function Users() {
                   <p>{selectedUser.email}</p>
                 </div>
                 <div className="admin-user-actions admin-profile-actions">
-                  <StatusBadge status={selectedUser.isBlocked ? 'rejected' : 'approved'} />
+                  {selectedUser.isBlocked ? <StatusBadge hiddenStatuses={[]} status="rejected" /> : null}
                   <button
                     className={`button button-compact ${selectedUser.isBlocked ? 'button-secondary' : 'button-danger'}`}
                     onClick={() => toggleUserBlock(selectedUser._id, selectedUser.isBlocked)}

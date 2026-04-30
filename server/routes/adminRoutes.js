@@ -5,6 +5,7 @@ import {
   createAdminAppointment,
   createServiceCatalogItem,
   createUser,
+  deleteDocument,
   deleteServiceCatalogItem,
   deleteUser,
   getAdminMessages,
@@ -43,9 +44,10 @@ router.get('/documents', getAllDocuments)
 router.post('/documents/upload', upload.single('file'), uploadDocument)
 router.get('/documents/:id/download', downloadAdminDocument)
 router.patch('/documents/:id', reviewDocument)
+router.delete('/documents/:id', deleteDocument)
 router.get('/service-catalog', getServiceCatalog)
-router.post('/service-catalog', createServiceCatalogItem)
-router.patch('/service-catalog/:id', updateServiceCatalogItem)
+router.post('/service-catalog', upload.single('serviceImage'), createServiceCatalogItem)
+router.patch('/service-catalog/:id', upload.single('serviceImage'), updateServiceCatalogItem)
 router.delete('/service-catalog/:id', deleteServiceCatalogItem)
 router.get('/services', getAllServices)
 router.post('/services', assignService)

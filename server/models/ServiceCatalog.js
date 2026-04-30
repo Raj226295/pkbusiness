@@ -23,6 +23,22 @@ const serviceCatalogSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    image: {
+      type: String,
+      default: '',
+    },
+    imageZoom: {
+      type: Number,
+      default: 1,
+    },
+    imageOffsetX: {
+      type: Number,
+      default: 0,
+    },
+    imageOffsetY: {
+      type: Number,
+      default: 0,
+    },
     sortOrder: {
       type: Number,
       default: 0,

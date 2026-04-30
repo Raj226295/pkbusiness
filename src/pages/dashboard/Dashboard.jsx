@@ -6,9 +6,42 @@ import StatusBadge from '../../components/common/StatusBadge.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { serviceSelectionFlow } from '../../data/serviceSelectionFlow.js'
+import { getServiceSelectionByDocumentType } from '../../data/serviceSelectionFlow.js'
 import api, { extractApiError } from '../../lib/api.js'
 import { formatCurrency, formatDateTime } from '../../lib/formatters.js'
+import { getServicePaymentEligibility } from '../../lib/paymentEligibility.js'
+import { resolveUploadUrl } from '../../lib/uploads.js'
+
+function isActiveServiceStatus(status = '') {
+  return !['rejected', 'completed'].includes(status)
+}
+
+function getServiceSnapshotMessage(service, paymentState) {
+  switch (paymentState.stage) {
+    case 'service_completed':
+      return service.adminRemarks || 'Admin marked this service as completed.'
+    case 'service_rejected':
+      return service.adminRemarks || 'Admin rejected this service. Please review the remark.'
+    case 'service_in_progress':
+      return 'Payment verified. Work on this service is now in progress.'
+    case 'approved':
+      return 'Payment verified successfully.'
+    case 'under_review':
+      return 'Payment screenshot is under admin verification.'
+    case 'ready':
+      return 'Admin approved this service and payment is ready.'
+    case 'retry':
+      return paymentState.latestPayment?.reviewRemarks || 'Previous payment was rejected. Retry payment.'
+    case 'awaiting_price':
+      return 'Documents are approved. Final price is still pending from admin.'
+    case 'review_pending':
+      return 'Documents are under admin review.'
+    case 'service_pending_approval':
+      return 'Service request is waiting for admin approval.'
+    default:
+      return service.description || service.notes || 'Assigned by the CA team.'
+  }
+}
 
 function Dashboard() {
   const { user } = useAuth()
@@ -20,13 +53,15 @@ function Dashboard() {
   useEffect(() => {
     Promise.all([
       api.get('/api/services'),
+      api.get('/api/services/catalog'),
       api.get('/api/documents'),
       api.get('/api/appointments'),
       api.get('/api/payments'),
       api.get('/api/notifications'),
     ])
-      .then(([servicesRes, documentsRes, appointmentsRes, paymentsRes, notificationsRes]) => {
+      .then(([servicesRes, catalogRes, documentsRes, appointmentsRes, paymentsRes, notificationsRes]) => {
         const services = servicesRes.data.services
+        const catalogServices = catalogRes.data.services
         const documents = documentsRes.data.documents
         const appointments = appointmentsRes.data.appointments
         const payments = paymentsRes.data.payments
@@ -34,12 +69,13 @@ function Dashboard() {
 
         setSummary({
           services,
+          catalogServices,
           documents,
           appointments,
           payments,
           notifications,
           totalServices: services.length,
-          activeServices: services.filter((item) => item.status !== 'completed').length,
+          activeServices: services.filter((item) => isActiveServiceStatus(item.status)).length,
           completedServices: services.filter((item) => item.status === 'completed').length,
           pendingDocuments: documents.filter((item) => item.status === 'pending').length,
           unreadNotifications: notifications.filter((item) => !item.read).length,
@@ -101,11 +137,77 @@ function Dashboard() {
       .slice(0, 6)
   }, [summary])
 
+  const paymentActionServices = useMemo(() => {
+    if (!summary) {
+      return []
+    }
+
+    return summary.services
+      .map((service) => ({
+        service,
+        paymentState: getServicePaymentEligibility({
+          service,
+          documents: summary.documents,
+          payments: summary.payments,
+        }),
+      }))
+      .filter(({ paymentState }) => paymentState.isReadyForPayment)
+  }, [summary])
+
+  const serviceStates = useMemo(() => {
+    if (!summary) {
+      return []
+    }
+
+    return summary.services.map((service) => ({
+      service,
+      paymentState: getServicePaymentEligibility({
+        service,
+        documents: summary.documents,
+        payments: summary.payments,
+      }),
+    }))
+  }, [summary])
+
+  const availableCatalogServices = useMemo(() => {
+    if (!summary) {
+      return []
+    }
+
+    return (summary.catalogServices || []).map((service) => {
+      const guide = getServiceSelectionByDocumentType(service.name)
+      const imageIndex = guide ? Math.max(guide.documentTypes.indexOf(service.name), 0) : -1
+
+      return {
+        ...service,
+        guide,
+        cardImageUrl: service.image
+          ? resolveUploadUrl(service.image)
+          : guide
+            ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.src || ''
+            : '',
+        cardImageAlt: guide ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.alt || `${service.name} poster` : `${service.name} poster`,
+        cardImageStyle: service.image
+          ? {
+              objectPosition: `${50 + Number(service.imageOffsetX || 0)}% ${50 + Number(service.imageOffsetY || 0)}%`,
+              transform: `scale(${Number(service.imageZoom || 1)})`,
+            }
+          : undefined,
+        summaryCopy: guide?.summary || service.description || 'Upload documents to start this service.',
+      }
+    })
+  }, [summary])
+
   if (loading) {
     return <Loader message="Loading dashboard..." />
   }
 
   const handleServiceSelect = (serviceId) => {
+    if (!serviceId) {
+      navigate('/dashboard/upload-documents')
+      return
+    }
+
     navigate(`/dashboard/upload-documents?service=${serviceId}`)
   }
 
@@ -131,6 +233,50 @@ function Dashboard() {
             </div>
           </section>
 
+          <section className="panel">
+            <div className="document-history-head">
+              <div>
+                <span className="eyebrow">Payment Box</span>
+                <h3>Ready payment actions</h3>
+                <p>Payment tabhi yahan dikhai dega jab admin service approve karega, documents review karega, aur final price set karega.</p>
+              </div>
+            </div>
+
+            {paymentActionServices.length ? (
+              <div className="list-stack">
+                {paymentActionServices.map(({ service, paymentState }) => (
+                  <div className="card-inline" key={service._id}>
+                    <div className="list-item stretch">
+                      <div>
+                        <strong>{service.type}</strong>
+                        <p>{service.description || 'Service is ready for payment.'}</p>
+                        <small>{formatCurrency(service.price || 0)}</small>
+                      </div>
+                      <button
+                        className="button button-primary"
+                        onClick={() =>
+                          navigate('/dashboard/payments', {
+                            state: {
+                              serviceId: service._id,
+                            },
+                          })
+                        }
+                        type="button"
+                      >
+                        {paymentState.latestRejectedPayment ? 'Retry Payment' : 'Pay Now'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                description="Upload documents first. Payment box yahin show hoga jab admin approval, review, aur price update complete karega."
+                title="No payment action yet"
+              />
+            )}
+          </section>
+
           <section className="stats-grid admin-stats-grid">
             <StatCard hint="Services assigned to your account" label="Total Services" value={summary.totalServices} />
             <StatCard hint="Open services still moving" label="Active Services" value={summary.activeServices} />
@@ -148,27 +294,34 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="dashboard-services-grid">
-              {serviceSelectionFlow.map((service) => (
-                <button
-                  className="service-selection-card"
-                  key={service.id}
-                  onClick={() => handleServiceSelect(service.id)}
-                  type="button"
-                >
-                  <div className={`service-card-media ${service.cardImages.length > 1 ? 'dual' : ''}`}>
-                    {service.cardImages.map((image) => (
-                      <img alt={image.alt} key={image.alt} loading="lazy" src={image.src} />
-                    ))}
-                  </div>
-                  <div className="service-card-body">
-                    <strong>{service.name}</strong>
-                    <p>{service.summary}</p>
-                    <span className="service-card-link">Submit documents</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {availableCatalogServices.length ? (
+              <div className="dashboard-services-grid">
+                {availableCatalogServices.map((service) => (
+                  <button
+                    className="service-selection-card"
+                    key={service._id}
+                    onClick={() => handleServiceSelect(service.guide?.id || '')}
+                    type="button"
+                  >
+                    {service.cardImageUrl ? (
+                      <div className="service-card-media">
+                        <img alt={service.cardImageAlt} loading="lazy" src={service.cardImageUrl} style={service.cardImageStyle} />
+                      </div>
+                    ) : null}
+                    <div className="service-card-body">
+                      <strong>{service.name}</strong>
+                      <p>{service.summaryCopy}</p>
+                      <span className="service-card-link">Submit documents</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                description="Admin service catalog publish karega to yahan available services dikhengi."
+                title="No services available"
+              />
+            )}
           </section>
 
           <section className="card-grid three-up">
@@ -294,17 +447,22 @@ function Dashboard() {
                 </div>
               </div>
 
-              {summary.services.length ? (
+              {serviceStates.length ? (
                 <div className="list-stack">
-                  {summary.services.slice(0, 4).map((service) => (
+                  {serviceStates.slice(0, 4).map(({ service, paymentState }) => (
                     <div className="card-inline" key={service._id}>
                       <div className="list-item stretch">
                         <div>
                           <strong>{service.type}</strong>
-                          <p>{service.description || service.notes || 'Assigned by the CA team.'}</p>
+                          <p>{getServiceSnapshotMessage(service, paymentState)}</p>
                           <small>{service.price ? formatCurrency(service.price) : 'Price will be shared by admin.'}</small>
                         </div>
-                        <StatusBadge status={service.status} />
+                        <div className="list-meta-group">
+                          <StatusBadge status={service.status} />
+                          {paymentState.latestPayment ? (
+                            <StatusBadge status={paymentState.latestPayment.verificationStatus || paymentState.latestPayment.status} />
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}

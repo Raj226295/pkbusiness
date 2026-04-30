@@ -7,16 +7,82 @@ import Loader from '../../components/common/Loader.jsx'
 import { getServiceSelectionByDocumentType } from '../../data/serviceSelectionFlow.js'
 import api, { extractApiError } from '../../lib/api.js'
 import { formatCurrency, formatDate } from '../../lib/formatters.js'
+import { getServicePaymentEligibility } from '../../lib/paymentEligibility.js'
+import { resolveUploadUrl } from '../../lib/uploads.js'
+
+const visibleServiceStatuses = ['pending', 'approved', 'rejected', 'in progress', 'completed']
+
+function getServiceStageTitle(state) {
+  switch (state.stage) {
+    case 'service_completed':
+      return 'Service completed'
+    case 'service_rejected':
+      return 'Service rejected'
+    case 'service_in_progress':
+      return 'Work in progress'
+    case 'approved':
+      return 'Payment approved'
+    case 'under_review':
+      return 'Payment under review'
+    case 'ready':
+      return 'Approved for payment'
+    case 'retry':
+      return 'Retry payment'
+    case 'awaiting_price':
+      return 'Waiting for price'
+    case 'review_pending':
+      return 'Documents under review'
+    case 'reupload_required':
+      return 'Re-upload required'
+    case 'service_pending_approval':
+      return 'Waiting for admin approval'
+    default:
+      return 'Upload documents'
+  }
+}
+
+function getPaymentHint(service, state) {
+  switch (state.stage) {
+    case 'service_completed':
+      return service.adminRemarks || 'Admin has marked this service as completed.'
+    case 'service_rejected':
+      return service.adminRemarks || 'Admin has rejected this service. Please review the note and upload corrected documents if needed.'
+    case 'service_in_progress':
+      return 'Payment is verified and the admin team is now working on this service.'
+    case 'service_pending_approval':
+      return 'Admin will first approve this service, then payment will open after document review and price update.'
+    case 'ready':
+      return 'Admin approved this service, reviewed the documents, and set the final price. Payment is ready now.'
+    case 'retry':
+      return state.latestPayment?.reviewRemarks
+        ? `Payment rejected: ${state.latestPayment.reviewRemarks}`
+        : 'Previous payment was rejected. Please submit payment again.'
+    case 'under_review':
+      return 'Payment request submitted. Admin is verifying screenshot and transaction ID.'
+    case 'approved':
+      return 'Payment approved successfully.'
+    case 'awaiting_price':
+      return 'Admin is yet to set the final service price.'
+    case 'review_pending':
+      return 'Documents are still under admin review.'
+    case 'reupload_required':
+      return 'Some documents were rejected. Please upload the corrected files.'
+    default:
+      return 'Upload documents to move this service ahead.'
+  }
+}
 
 function Services() {
   const [services, setServices] = useState([])
   const [catalog, setCatalog] = useState([])
+  const [documents, setDocuments] = useState([])
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
   const selectedServices = useMemo(
-    () => services.filter((service) => ['pending', 'in progress', 'completed'].includes(service.status)),
+    () => services.filter((service) => visibleServiceStatuses.includes(service.status)),
     [services],
   )
 
@@ -28,15 +94,46 @@ function Services() {
       return {
         ...service,
         guide,
-        cardImage: guide ? guide.cardImages[imageIndex] || guide.cardImages[0] : null,
+        cardImageUrl: service.image
+          ? resolveUploadUrl(service.image)
+          : guide
+            ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.src || ''
+            : '',
+        cardImageAlt: guide ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.alt || `${service.name} poster` : `${service.name} poster`,
+        cardImageStyle: service.image
+          ? {
+              objectPosition: `${50 + Number(service.imageOffsetX || 0)}% ${50 + Number(service.imageOffsetY || 0)}%`,
+              transform: `scale(${Number(service.imageZoom || 1)})`,
+            }
+          : undefined,
       }
     })
   }, [catalog])
 
+  const selectedServiceStates = useMemo(
+    () =>
+      selectedServices.map((service) => ({
+        service,
+        paymentState: getServicePaymentEligibility({
+          service,
+          documents,
+          payments,
+        }),
+      })),
+    [documents, payments, selectedServices],
+  )
+
   const loadData = async () => {
-    const [servicesRes, catalogRes] = await Promise.all([api.get('/api/services'), api.get('/api/services/catalog')])
+    const [servicesRes, catalogRes, documentsRes, paymentsRes] = await Promise.all([
+      api.get('/api/services'),
+      api.get('/api/services/catalog'),
+      api.get('/api/documents'),
+      api.get('/api/payments'),
+    ])
     setServices(servicesRes.data.services)
     setCatalog(catalogRes.data.services)
+    setDocuments(documentsRes.data.documents || [])
+    setPayments(paymentsRes.data.payments || [])
   }
 
   useEffect(() => {
@@ -68,7 +165,6 @@ function Services() {
   const handleProceedToPayment = (service) => {
     navigate('/dashboard/payments', {
       state: {
-        catalogServiceId: service.catalogService?._id || '',
         serviceId: service._id,
       },
     })
@@ -106,15 +202,15 @@ function Services() {
                 onClick={() => handleOpenUploadDocuments(service.name)}
                 type="button"
               >
-                {service.cardImage ? (
+                {service.cardImageUrl ? (
                   <div className="service-card-media">
-                    <img alt={`${service.name} poster`} loading="lazy" src={service.cardImage.src} />
+                    <img alt={service.cardImageAlt} loading="lazy" src={service.cardImageUrl} style={service.cardImageStyle} />
                   </div>
                 ) : null}
                 <div className="service-card-body">
                   <strong>{service.name}</strong>
                   <p>{service.description || service.guide?.summary || 'Professional support for this service.'}</p>
-                  <span className="status-badge success service-card-price">{formatCurrency(service.price)}</span>
+                  <span className="status-badge neutral service-card-price">Final price after review</span>
                   <span className="service-card-link">Upload documents</span>
                 </div>
               </button>
@@ -133,13 +229,18 @@ function Services() {
           </div>
         </div>
 
-        {selectedServices.length ? (
+        {selectedServiceStates.length ? (
           <div className="card-grid two-up">
-            {selectedServices.map((service) => (
+            {selectedServiceStates.map(({ service, paymentState }) => (
               <article className="panel" key={service._id}>
                 <div className="list-item">
                   <strong>{service.type}</strong>
-                  <StatusBadge status={service.status} />
+                  <div className="list-meta-group">
+                    <StatusBadge status={service.status} />
+                    {paymentState.latestPayment ? (
+                      <StatusBadge status={paymentState.latestPayment.verificationStatus || paymentState.latestPayment.status} />
+                    ) : null}
+                  </div>
                 </div>
                 <p>{service.description || service.notes || 'Assigned by the CA team.'}</p>
                 <div className="detail-row">
@@ -149,13 +250,21 @@ function Services() {
                 {service.price ? <small>Price: {formatCurrency(service.price)}</small> : null}
                 {service.notes ? <small>Your note: {service.notes}</small> : null}
                 {service.adminRemarks ? <small>Admin remarks: {service.adminRemarks}</small> : null}
+                <small>{getServiceStageTitle(paymentState)}</small>
+                <small>{getPaymentHint(service, paymentState)}</small>
                 <div className="section-actions">
-                  <button className="button button-primary" onClick={() => handleOpenUploadDocuments(service.type)} type="button">
-                    Upload Documents
-                  </button>
-                  {['pending', 'in progress'].includes(service.status) ? (
+                  {!paymentState.isServiceCompleted ? (
+                    <button className="button button-primary" onClick={() => handleOpenUploadDocuments(service.type)} type="button">
+                      {paymentState.isServiceRejected ? 'Upload Corrected Documents' : 'Upload Documents'}
+                    </button>
+                  ) : null}
+                  {paymentState.isReadyForPayment ? (
                     <button className="button button-secondary" onClick={() => handleProceedToPayment(service)} type="button">
-                      Proceed to Payment
+                      {paymentState.latestRejectedPayment ? 'Retry Payment' : 'Proceed to Payment'}
+                    </button>
+                  ) : paymentState.hasPendingPayment || paymentState.hasVerifiedPayment || paymentState.latestPayment ? (
+                    <button className="button button-secondary" onClick={() => navigate('/dashboard/payments')} type="button">
+                      Open Payments
                     </button>
                   ) : null}
                 </div>

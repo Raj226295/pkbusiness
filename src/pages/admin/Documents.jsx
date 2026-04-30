@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
@@ -10,15 +10,26 @@ import { downloadFileFromApi } from '../../lib/downloads.js'
 import { formatDate, formatDateTime } from '../../lib/formatters.js'
 
 function Documents() {
-  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { userId: routeUserId = '' } = useParams()
   const [documents, setDocuments] = useState([])
   const [folders, setFolders] = useState([])
   const [users, setUsers] = useState([])
   const [activeUserId, setActiveUserId] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [downloadingId, setDownloadingId] = useState('')
+  const [deletingId, setDeletingId] = useState('')
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState({ type: '', message: '' })
+
+  const filterLabels = {
+    all: 'All Documents',
+    pending: 'Needs Review',
+    approved: 'Reviewed',
+    rejected: 'Rejected',
+  }
+
+  const isFolderDetailPage = Boolean(routeUserId)
 
   const loadData = async () => {
     const [{ data: documentsData }, { data: usersData }] = await Promise.all([
@@ -30,7 +41,17 @@ function Documents() {
     setDocuments(documentsData.documents || [])
     setFolders(documentsData.folders || [])
     setUsers(clientUsers)
-    setActiveUserId((current) => (clientUsers.some((user) => user._id === current) ? current : clientUsers[0]?._id || ''))
+    setActiveUserId((current) => {
+      if (routeUserId && clientUsers.some((user) => user._id === routeUserId)) {
+        return routeUserId
+      }
+
+      if (clientUsers.some((user) => user._id === current)) {
+        return current
+      }
+
+      return clientUsers[0]?._id || ''
+    })
   }
 
   useEffect(() => {
@@ -41,7 +62,7 @@ function Documents() {
       .finally(() => {
         setLoading(false)
       })
-  }, [])
+  }, [routeUserId])
 
   const folderCards = useMemo(() => {
     const userLookup = new Map(users.map((user) => [user._id, user]))
@@ -74,21 +95,19 @@ function Documents() {
   }, [folders, users])
 
   const activeFolder = useMemo(
-    () => folderCards.find((folder) => folder.userId === activeUserId) || folderCards[0] || null,
+    () => folderCards.find((folder) => folder.userId === activeUserId) || null,
     [activeUserId, folderCards],
   )
 
   useEffect(() => {
-    const requestedUserId = searchParams.get('userId')
-
-    if (!requestedUserId) {
+    if (!routeUserId) {
       return
     }
 
-    if (folderCards.some((folder) => folder.userId === requestedUserId)) {
-      setActiveUserId(requestedUserId)
+    if (folderCards.some((folder) => folder.userId === routeUserId)) {
+      setActiveUserId(routeUserId)
     }
-  }, [folderCards, searchParams])
+  }, [folderCards, routeUserId])
 
   const activeDocuments = useMemo(() => {
     return documents.filter((document) => {
@@ -110,50 +129,105 @@ function Documents() {
     }
   }
 
+  const handleDelete = async (document) => {
+    if (!window.confirm(`Delete ${document.originalName || document.filename}? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingId(document._id)
+
+    try {
+      await api.delete(`/api/admin/documents/${document._id}`)
+      await loadData()
+      setStatus({
+        type: 'success',
+        message: `${document.originalName || document.filename} deleted successfully.`,
+      })
+    } catch (error) {
+      setStatus({ type: 'error', message: extractApiError(error) })
+    } finally {
+      setDeletingId('')
+    }
+  }
+
   if (loading) {
     return <Loader message="Loading client folders..." />
+  }
+
+  if (isFolderDetailPage && !activeFolder) {
+    return (
+      <div className="page-stack">
+        <PageHeader
+          description="The selected folder could not be found."
+          eyebrow="My Folder"
+          title="Folder Not Found"
+        />
+        <button className="button button-ghost button-compact" onClick={() => navigate('/admin/folders')} type="button">
+          Back To Folders
+        </button>
+        <EmptyState
+          description="Please go back to the folder list and choose a valid client folder."
+          title="Folder not available"
+        />
+      </div>
+    )
   }
 
   return (
     <div className="page-stack">
       <PageHeader
-        description="Open user-wise document folders, review every uploaded file, and preview or download the records you need."
+        description={
+          isFolderDetailPage
+            ? 'Preview, share, download, and delete files from this dedicated client folder.'
+            : 'Tap any folder card to open that client folder on a new page.'
+        }
         eyebrow="My Folder"
-        title="Client Folders"
+        title={isFolderDetailPage && activeFolder ? `${activeFolder.user.name} Folder` : 'Client Folders'}
       />
 
       {status.message ? <p className={`form-message ${status.type}`}>{status.message}</p> : null}
 
-      <section className="admin-folder-grid">
-        {folderCards.map((folder) => (
-          <button
-            className={`admin-folder-card ${activeFolder?.userId === folder.userId ? 'active' : ''}`}
-            key={folder.userId}
-            onClick={() => setActiveUserId(folder.userId)}
-            type="button"
-          >
-            <div className="admin-folder-card-head">
-              <UserAvatar alt={`${folder.user.name} profile`} className="admin-folder-avatar" user={folder.user} />
-              <div>
-                <strong>{folder.user.name}</strong>
-                <span>{folder.user.name} Folder</span>
-                <span>{folder.user.email}</span>
-              </div>
-            </div>
-            <div className="admin-folder-card-stats">
-              <span>{folder.totalFiles} files</span>
-              <span>{folder.pendingCount} pending</span>
-            </div>
-            <small>
-              {folder.lastUploadDate ? `Last upload ${formatDate(folder.lastUploadDate)}` : 'No uploads yet'}
-            </small>
+      {!isFolderDetailPage ? (
+        folderCards.length ? (
+          <section className="admin-folder-grid">
+            {folderCards.map((folder) => (
+              <button
+                className="admin-folder-card"
+                key={folder.userId}
+                onClick={() => navigate(`/admin/folders/${folder.userId}`)}
+                type="button"
+              >
+                <div className="admin-folder-card-head">
+                  <UserAvatar alt={`${folder.user.name} profile`} className="admin-folder-avatar" user={folder.user} />
+                  <div>
+                    <strong>{folder.user.name}</strong>
+                    <span>{folder.user.name} Folder</span>
+                    <span>{folder.user.email}</span>
+                  </div>
+                </div>
+                <div className="admin-folder-card-stats">
+                  <span>{folder.totalFiles} files</span>
+                  <span>{folder.pendingCount} updates</span>
+                </div>
+                <small>
+                  {folder.lastUploadDate ? `Last upload ${formatDate(folder.lastUploadDate)}` : 'Folder ready for first file'}
+                </small>
+              </button>
+            ))}
+          </section>
+        ) : (
+          <EmptyState
+            description="User-wise folders will appear here automatically as soon as client accounts are added."
+            title="No folders yet"
+          />
+        )
+      ) : (
+        <>
+          <button className="button button-ghost button-compact" onClick={() => navigate('/admin/folders')} type="button">
+            Back To Folders
           </button>
-        ))}
-      </section>
 
-      <section className="panel admin-folder-detail">
-        {activeFolder ? (
-          <>
+          <section className="panel admin-folder-detail">
             <div className="admin-folder-detail-head">
               <div>
                 <span className="admin-surface-eyebrow">Selected Folder</span>
@@ -164,10 +238,10 @@ function Documents() {
               <div className="admin-folder-filter-row">
                 <div className="admin-folder-summary-pill">{activeFolder.totalFiles} total files</div>
                 <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
-                  <option value="all">All Documents</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="all">{filterLabels.all}</option>
+                  <option value="pending">{filterLabels.pending}</option>
+                  <option value="approved">{filterLabels.approved}</option>
+                  <option value="rejected">{filterLabels.rejected}</option>
                 </select>
               </div>
             </div>
@@ -178,11 +252,11 @@ function Documents() {
                 <strong>{activeFolder.totalFiles}</strong>
               </article>
               <article className="admin-preview-metric">
-                <span>Pending</span>
+                <span>Needs Review</span>
                 <strong>{activeFolder.pendingCount}</strong>
               </article>
               <article className="admin-preview-metric">
-                <span>Approved</span>
+                <span>Reviewed</span>
                 <strong>{activeFolder.approvedCount}</strong>
               </article>
               <article className="admin-preview-metric">
@@ -205,6 +279,15 @@ function Documents() {
                         <span>Service: {document.serviceType}</span>
                         <span>Uploaded: {formatDateTime(document.createdAt)}</span>
                       </div>
+                      <div className="admin-meta-row">
+                        <span>
+                          {document.uploadedBy?.role === 'admin'
+                            ? `Shared by ${document.uploadedBy.name}`
+                            : 'Submitted by user'}
+                        </span>
+                        <span>{document.reviewedAt ? `Reviewed ${formatDateTime(document.reviewedAt)}` : 'Not reviewed yet'}</span>
+                      </div>
+                      {document.notes ? <p className="admin-client-note">Note: {document.notes}</p> : null}
                     </div>
 
                     <div className="admin-record-actions">
@@ -221,6 +304,14 @@ function Documents() {
                           Preview
                         </a>
                       ) : null}
+                      <button
+                        className="button button-danger button-compact"
+                        disabled={deletingId === document._id}
+                        onClick={() => handleDelete(document)}
+                        type="button"
+                      >
+                        {deletingId === document._id ? 'Deleting...' : 'Delete'}
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -229,20 +320,15 @@ function Documents() {
               <EmptyState
                 description={
                   statusFilter === 'all'
-                    ? 'This client has not uploaded any documents yet.'
-                    : `No ${statusFilter} documents were found in this folder.`
+                    ? 'This folder is ready. Add the first file from the form above.'
+                    : `No ${filterLabels[statusFilter] || 'matching'} documents were found in this folder.`
                 }
                 title="No files to show"
               />
             )}
-          </>
-        ) : (
-          <EmptyState
-            description="User-wise folders will appear here automatically as soon as clients start uploading service documents."
-            title="No folders yet"
-          />
-        )}
-      </section>
+          </section>
+        </>
+      )}
     </div>
   )
 }

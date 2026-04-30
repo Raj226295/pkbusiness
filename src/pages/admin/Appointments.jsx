@@ -194,7 +194,7 @@ function Appointments() {
             Status
             <select name="status" onChange={handleFormChange} value={form.status}>
               <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
+              <option value="pending">Awaiting</option>
               <option value="scheduled">Scheduled</option>
             </select>
           </label>
@@ -221,7 +221,7 @@ function Appointments() {
 
           <select onChange={(event) => setFilter(event.target.value)} value={filter}>
             <option value="all">All statuses</option>
-            <option value="pending">Pending</option>
+            <option value="pending">Awaiting</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
             <option value="rejected">Rejected</option>
@@ -288,7 +288,7 @@ function Appointments() {
                         }
                         value={draft.status}
                       >
-                        <option value="pending">Pending</option>
+                        <option value="pending">Awaiting</option>
                         <option value="confirmed">Confirmed</option>
                         <option value="completed">Completed</option>
                         <option value="rejected">Rejected</option>

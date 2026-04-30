@@ -2346,6 +2346,14 @@ textarea {
   box-shadow: var(--card-shadow);
 }
 
+.user-pill-button {
+  appearance: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
 .user-pill-avatar {
   width: 56px;
   height: 56px;

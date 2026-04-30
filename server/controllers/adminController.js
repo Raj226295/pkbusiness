@@ -11,6 +11,8 @@ import User from '../models/User.js'
 import { createNotification } from '../utils/createNotification.js'
 import {
   buildClientFolderName,
+  ensureClientDocumentFolder,
+  removeClientDocumentFolder,
   resolveStoredDocumentPath,
   serializeDocument,
   uploadsRoot,
@@ -52,6 +54,41 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+
+  return Math.min(Math.max(parsed, min), max)
+}
+
+function parseBoolean(value, fallback = false) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+
+    if (normalized === 'true') return true
+    if (normalized === 'false') return false
+  }
+
+  return fallback
+}
+
+const validServiceStatuses = ['pending', 'approved', 'rejected', 'in progress', 'completed']
+
+function resolveServiceStatus(value, fallback = 'pending') {
+  return validServiceStatuses.includes(value) ? value : fallback
+}
+
+function isServiceActiveStatus(status = '') {
+  return !['rejected', 'completed'].includes(status)
+}
+
 function isPathInsideUploadsRoot(targetPath = '') {
   const resolvedRoot = path.resolve(uploadsRoot)
   const resolvedTarget = path.resolve(targetPath)
@@ -80,6 +117,14 @@ function resolveProfileImagePath(profileImage = '') {
   return path.join(uploadsRoot, profileImage.replace(/^\/uploads\//, ''))
 }
 
+function resolveUploadAssetPath(filePath = '') {
+  if (!filePath.startsWith('/uploads/')) {
+    return ''
+  }
+
+  return path.join(uploadsRoot, filePath.replace(/^\/uploads\//, ''))
+}
+
 function mapAggregateById(records, transform = (record) => record) {
   return new Map(records.map((record) => [String(record._id), transform(record)]))
 }
@@ -92,7 +137,7 @@ async function buildUserSummaryMaps() {
         $group: {
           _id: '$user',
           total: { $sum: 1 },
-          active: { $sum: { $cond: [{ $ne: ['$status', 'completed'] }, 1, 0] } },
+          active: { $sum: { $cond: [{ $in: ['$status', ['rejected', 'completed']] }, 0, 1] } },
           completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
         },
       },
@@ -171,6 +216,20 @@ function formatDateTimeLabel(value) {
   }).format(new Date(value))
 }
 
+function buildEmptyFolderSummary(user) {
+  return {
+    userId: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    folderName: buildClientFolderName(user),
+    documentCount: 0,
+    pendingCount: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+    lastSubmittedAt: '',
+  }
+}
+
 function createEmptyMessageThread(user) {
   const profile = typeof user.toObject === 'function' ? user.toObject() : { ...user }
 
@@ -242,7 +301,7 @@ export const getAdminOverview = asyncHandler(async (_req, res) => {
   ] = await Promise.all([
     User.countDocuments({ role: 'user' }),
     Document.countDocuments(),
-    Service.countDocuments({ status: { $ne: 'completed' } }),
+    Service.countDocuments({ status: { $nin: ['rejected', 'completed'] } }),
     Service.countDocuments({ status: 'completed' }),
     Document.countDocuments({ status: 'pending' }),
     Payment.countDocuments({
@@ -584,7 +643,7 @@ export const getUserDetails = asyncHandler(async (req, res) => {
       .populate('reviewedBy', 'name email role')
       .sort({ createdAt: -1 }),
     Service.find({ user: user._id }).populate('catalogService').sort({ updatedAt: -1 }),
-    Payment.find({ user: user._id }).populate('verifiedBy', 'name').sort({ createdAt: -1 }),
+    Payment.find({ user: user._id }).populate('verifiedBy', 'name').populate('service', 'type price status').sort({ createdAt: -1 }),
     Appointment.find({ user: user._id }).sort({ scheduledFor: -1 }),
     Notification.find({ user: user._id }).sort({ createdAt: -1 }).limit(8),
   ])
@@ -628,6 +687,8 @@ export const createUser = asyncHandler(async (req, res) => {
     companyName,
     role: 'user',
   })
+
+  await ensureClientDocumentFolder(user)
 
   res.status(201).json({
     message: 'User created successfully',
@@ -703,6 +764,8 @@ export const deleteUser = asyncHandler(async (req, res) => {
     User.deleteOne({ _id: user._id }),
   ])
 
+  await removeClientDocumentFolder(user)
+
   res.json({ message: 'User and related records deleted successfully' })
 })
 
@@ -744,14 +807,19 @@ export const sendUserMessage = asyncHandler(async (req, res) => {
 })
 
 export const getAllDocuments = asyncHandler(async (_req, res) => {
-  const documents = await Document.find()
-    .populate('user', 'name email role')
-    .populate('uploadedBy', 'name email role')
-    .populate('reviewedBy', 'name email role')
-    .sort({ createdAt: -1 })
+  const [documents, clientUsers] = await Promise.all([
+    Document.find()
+      .populate('user', 'name email role')
+      .populate('uploadedBy', 'name email role')
+      .populate('reviewedBy', 'name email role')
+      .sort({ createdAt: -1 }),
+    User.find({ role: 'user' }).select('name email role').sort({ createdAt: -1 }),
+  ])
+
+  await Promise.all(clientUsers.map((user) => ensureClientDocumentFolder(user)))
 
   const serializedDocuments = documents.map((document) => serializeDocument(document, 'admin'))
-  const folderMap = new Map()
+  const folderMap = new Map(clientUsers.map((user) => [user._id.toString(), buildEmptyFolderSummary(user)]))
 
   for (const document of serializedDocuments) {
     const user = document.user
@@ -761,21 +829,14 @@ export const getAllDocuments = asyncHandler(async (_req, res) => {
     }
 
     const key = user._id.toString()
-    const current = folderMap.get(key) || {
-      userId: key,
-      name: user.name,
-      email: user.email,
-      folderName: document.storageFolder || buildClientFolderName(user),
-      documentCount: 0,
-      pendingCount: 0,
-      approvedCount: 0,
-      rejectedCount: 0,
-      lastSubmittedAt: document.createdAt,
-    }
+    const current = folderMap.get(key) || buildEmptyFolderSummary(user)
 
     current.documentCount += 1
+    current.folderName = document.storageFolder || current.folderName
     current.lastSubmittedAt =
-      new Date(document.createdAt) > new Date(current.lastSubmittedAt) ? document.createdAt : current.lastSubmittedAt
+      !current.lastSubmittedAt || new Date(document.createdAt) > new Date(current.lastSubmittedAt)
+        ? document.createdAt
+        : current.lastSubmittedAt
 
     if (document.status === 'pending') current.pendingCount += 1
     if (document.status === 'approved') current.approvedCount += 1
@@ -784,9 +845,21 @@ export const getAllDocuments = asyncHandler(async (_req, res) => {
     folderMap.set(key, current)
   }
 
-  const folders = Array.from(folderMap.values()).sort(
-    (left, right) => new Date(right.lastSubmittedAt) - new Date(left.lastSubmittedAt),
-  )
+  const folders = Array.from(folderMap.values()).sort((left, right) => {
+    if (!left.lastSubmittedAt && !right.lastSubmittedAt) {
+      return left.name.localeCompare(right.name)
+    }
+
+    if (!left.lastSubmittedAt) {
+      return 1
+    }
+
+    if (!right.lastSubmittedAt) {
+      return -1
+    }
+
+    return new Date(right.lastSubmittedAt) - new Date(left.lastSubmittedAt)
+  })
 
   res.json({ documents: serializedDocuments, folders })
 })
@@ -831,8 +904,33 @@ export const reviewDocument = asyncHandler(async (req, res) => {
   res.json({ message: 'Document reviewed successfully', document: serializeDocument(document, 'admin') })
 })
 
+export const deleteDocument = asyncHandler(async (req, res) => {
+  const document = await Document.findById(req.params.id).populate('user', 'name email role')
+
+  if (!document) {
+    res.status(404)
+    throw new Error('Document not found')
+  }
+
+  await removeStoredFile(resolveStoredDocumentPath(document))
+  await document.deleteOne()
+
+  if (document.user?._id) {
+    await createNotification({
+      userId: document.user._id,
+      title: 'Document removed',
+      message: `${document.title || document.originalName || 'A document'} was removed from your folder by admin.`,
+      category: 'document',
+      link: '/dashboard/documents',
+      actionLabel: 'Open documents',
+    })
+  }
+
+  res.json({ message: 'Document deleted successfully' })
+})
+
 export const getServiceCatalog = asyncHandler(async (_req, res) => {
-  const services = await ServiceCatalog.find().sort({ sortOrder: 1, name: 1 })
+  const services = await ServiceCatalog.find().sort({ name: 1 })
   res.json({ services })
 })
 
@@ -840,10 +938,19 @@ export const createServiceCatalogItem = asyncHandler(async (req, res) => {
   const name = safeTrim(req.body.name)
   const description = safeTrim(req.body.description)
   const price = toNumber(req.body.price, NaN)
+  const image = req.file ? `/uploads/${req.file.filename}` : ''
+  const imageZoom = clampNumber(req.body.imageZoom, 1, 2.5, 1)
+  const imageOffsetX = clampNumber(req.body.imageOffsetX, -35, 35, 0)
+  const imageOffsetY = clampNumber(req.body.imageOffsetY, -35, 35, 0)
 
   if (!name || Number.isNaN(price)) {
     res.status(400)
     throw new Error('Service name and price are required')
+  }
+
+  if (req.file && !req.file.mimetype.startsWith('image/')) {
+    res.status(400)
+    throw new Error('Only image files are allowed for service artwork')
   }
 
   const existing = await ServiceCatalog.findOne({ name })
@@ -857,8 +964,11 @@ export const createServiceCatalogItem = asyncHandler(async (req, res) => {
     name,
     description,
     price,
-    isActive: req.body.isActive !== false,
-    sortOrder: toNumber(req.body.sortOrder, 0),
+    isActive: parseBoolean(req.body.isActive, true),
+    image,
+    imageZoom,
+    imageOffsetX,
+    imageOffsetY,
   })
 
   res.status(201).json({ message: 'Service added successfully', service })
@@ -872,12 +982,27 @@ export const updateServiceCatalogItem = asyncHandler(async (req, res) => {
     throw new Error('Service not found')
   }
 
+  if (req.file && !req.file.mimetype.startsWith('image/')) {
+    res.status(400)
+    throw new Error('Only image files are allowed for service artwork')
+  }
+
+  const previousImage = service.image
+  const nextImage = req.file ? `/uploads/${req.file.filename}` : service.image
+
   service.name = safeTrim(req.body.name, service.name)
   service.description = safeTrim(req.body.description, service.description)
   service.price = toNumber(req.body.price, service.price)
-  service.isActive = typeof req.body.isActive === 'boolean' ? req.body.isActive : service.isActive
-  service.sortOrder = toNumber(req.body.sortOrder, service.sortOrder)
+  service.isActive = parseBoolean(req.body.isActive, service.isActive)
+  service.image = nextImage
+  service.imageZoom = clampNumber(req.body.imageZoom, 1, 2.5, service.imageZoom ?? 1)
+  service.imageOffsetX = clampNumber(req.body.imageOffsetX, -35, 35, service.imageOffsetX ?? 0)
+  service.imageOffsetY = clampNumber(req.body.imageOffsetY, -35, 35, service.imageOffsetY ?? 0)
   await service.save()
+
+  if (req.file && previousImage && previousImage !== nextImage) {
+    await removeStoredFile(resolveUploadAssetPath(previousImage))
+  }
 
   res.json({ message: 'Service updated successfully', service })
 })
@@ -891,6 +1016,7 @@ export const deleteServiceCatalogItem = asyncHandler(async (req, res) => {
   }
 
   await Service.updateMany({ catalogService: service._id }, { $set: { catalogService: null } })
+  await removeStoredFile(resolveUploadAssetPath(service.image))
   await service.deleteOne()
 
   res.json({ message: 'Service deleted successfully' })
@@ -902,7 +1028,7 @@ export const getAllServices = asyncHandler(async (_req, res) => {
       .populate('user', 'name email')
       .populate('catalogService')
       .sort({ updatedAt: -1 }),
-    ServiceCatalog.find().sort({ sortOrder: 1, name: 1 }),
+    ServiceCatalog.find().sort({ name: 1 }),
   ])
 
   res.json({ services: assignments, catalog })
@@ -937,14 +1063,22 @@ export const assignService = asyncHandler(async (req, res) => {
     throw new Error('Service name is required')
   }
 
+  const requestedStatus = safeTrim(req.body.status, 'pending')
+  const status = resolveServiceStatus(requestedStatus, 'pending')
+  const adminRemarks = safeTrim(req.body.adminRemarks)
+
   const service = await Service.create({
     user: userId,
     catalogService: catalogItem?._id || null,
     type: payload.type,
     description: payload.description,
     price: payload.price,
+    status,
     priority: priority || 'medium',
     notes: safeTrim(notes),
+    adminRemarks,
+    requestedByClient: typeof req.body.requestedByClient === 'boolean' ? req.body.requestedByClient : false,
+    completedAt: status === 'completed' ? new Date() : null,
   })
 
   await createNotification({
@@ -967,11 +1101,21 @@ export const updateService = asyncHandler(async (req, res) => {
     throw new Error('Service not found')
   }
 
-  service.status = safeTrim(req.body.status, service.status) || service.status
+  const nextStatus = resolveServiceStatus(safeTrim(req.body.status, service.status) || service.status, service.status)
+
+  if (!validServiceStatuses.includes(nextStatus)) {
+    res.status(400)
+    throw new Error('Invalid service status')
+  }
+
+  service.status = nextStatus
   service.adminRemarks = safeTrim(req.body.adminRemarks, service.adminRemarks)
   service.notes = safeTrim(req.body.notes, service.notes)
   service.description = safeTrim(req.body.description, service.description)
   service.price = toNumber(req.body.price, service.price)
+  if (typeof req.body.requestedByClient === 'boolean') {
+    service.requestedByClient = req.body.requestedByClient
+  }
   service.completedAt = service.status === 'completed' ? service.completedAt || new Date() : null
   await service.save()
 
@@ -1074,6 +1218,7 @@ export const updateAppointment = asyncHandler(async (req, res) => {
 export const getAllPayments = asyncHandler(async (_req, res) => {
   const payments = await Payment.find()
     .populate('user', 'name email phone')
+    .populate('service', 'type price status')
     .populate('verifiedBy', 'name')
     .sort({ createdAt: -1 })
 
@@ -1108,6 +1253,11 @@ export const updatePayment = asyncHandler(async (req, res) => {
   }
 
   if (req.body.verificationStatus) {
+    if (!['pending', 'verified', 'rejected'].includes(req.body.verificationStatus)) {
+      res.status(400)
+      throw new Error('Invalid payment verification status')
+    }
+
     payment.verificationStatus = req.body.verificationStatus
 
     if (req.body.verificationStatus === 'verified') {
@@ -1122,6 +1272,13 @@ export const updatePayment = asyncHandler(async (req, res) => {
       payment.verifiedBy = req.user._id
       payment.verifiedAt = new Date()
     }
+
+    if (req.body.verificationStatus === 'pending') {
+      payment.status = 'pending'
+      payment.verifiedBy = null
+      payment.verifiedAt = null
+      payment.paidAt = payment.paymentMethod === 'online' ? payment.paidAt : null
+    }
   }
 
   if (req.body.status) {
@@ -1129,10 +1286,24 @@ export const updatePayment = asyncHandler(async (req, res) => {
   }
 
   await payment.save()
+  let movedServiceToInProgress = false
+
+  if (payment.verificationStatus === 'verified' && payment.service) {
+    const service = await Service.findById(payment.service)
+
+    if (service && isServiceActiveStatus(service.status) && service.status !== 'in progress') {
+      service.status = 'in progress'
+      service.completedAt = null
+      await service.save()
+      movedServiceToInProgress = true
+    }
+  }
 
   const paymentStatusMessage =
     payment.verificationStatus === 'verified'
-      ? `${payment.invoiceNumber} has been verified successfully.`
+      ? movedServiceToInProgress
+        ? `${payment.invoiceNumber} has been verified successfully. ${payment.serviceType} is now in progress.`
+        : `${payment.invoiceNumber} has been verified successfully.`
       : payment.verificationStatus === 'rejected'
         ? `${payment.invoiceNumber} has been rejected. Please review the admin remarks.`
         : `${payment.invoiceNumber} is now marked as ${payment.status}.`
