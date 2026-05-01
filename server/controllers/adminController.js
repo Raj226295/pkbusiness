@@ -163,7 +163,7 @@ async function buildUserSummaryMaps() {
           total: { $sum: 1 },
           pending: {
             $sum: {
-              $cond: [{ $in: ['$status', ['pending', 'scheduled', 'confirmed']] }, 1, 0],
+              $cond: [{ $in: ['$status', ['pending', 'approved', 'rescheduled', 'scheduled', 'confirmed']] }, 1, 0],
             },
           },
         },
@@ -214,6 +214,127 @@ function formatDateTimeLabel(value) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+const appointmentStatusAliases = {
+  confirmed: 'approved',
+  scheduled: 'rescheduled',
+}
+
+const validAppointmentStatuses = ['pending', 'approved', 'rejected', 'rescheduled', 'completed', 'cancelled']
+
+function normalizeAppointmentStatus(value = 'pending', fallback = 'pending') {
+  const normalizedValue = safeTrim(value, fallback).toLowerCase()
+  const normalizedFallback = safeTrim(fallback, 'pending').toLowerCase()
+  const canonicalValue = appointmentStatusAliases[normalizedValue] || normalizedValue
+  const canonicalFallback = appointmentStatusAliases[normalizedFallback] || normalizedFallback
+
+  if (validAppointmentStatuses.includes(canonicalValue)) {
+    return canonicalValue
+  }
+
+  if (validAppointmentStatuses.includes(canonicalFallback)) {
+    return canonicalFallback
+  }
+
+  return 'pending'
+}
+
+function toTitleCaseLabel(value = '') {
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function normalizeDocumentStatusForAdmin(status = '') {
+  const normalized = safeTrim(status).toLowerCase()
+
+  if (normalized === 'verified') {
+    return 'approved'
+  }
+
+  if (['pending', 'approved', 'rejected'].includes(normalized)) {
+    return normalized
+  }
+
+  return 'not submitted'
+}
+
+function normalizePaymentStatusForAdmin(payment = null) {
+  if (!payment) {
+    return 'not initiated'
+  }
+
+  const verificationStatus = safeTrim(payment.verificationStatus).toLowerCase()
+
+  if (verificationStatus === 'verified') {
+    return 'approved'
+  }
+
+  if (['pending', 'rejected'].includes(verificationStatus)) {
+    return verificationStatus
+  }
+
+  const paymentStatus = safeTrim(payment.status).toLowerCase()
+
+  if (['pending', 'paid', 'failed', 'rejected'].includes(paymentStatus)) {
+    return paymentStatus
+  }
+
+  return 'not initiated'
+}
+
+function pickLatestRecordByService(records = [], selectedService = '', fieldName = 'serviceType') {
+  const normalizedService = safeTrim(selectedService).toLowerCase()
+
+  if (!normalizedService) {
+    return records[0] || null
+  }
+
+  return (
+    records.find((record) => safeTrim(record?.[fieldName]).toLowerCase() === normalizedService) ||
+    records[0] ||
+    null
+  )
+}
+
+function deriveAppointmentServiceType(appointment, services = [], documents = [], payments = []) {
+  return (
+    safeTrim(appointment.serviceType) ||
+    safeTrim(services[0]?.type) ||
+    safeTrim(payments[0]?.serviceType) ||
+    safeTrim(documents[0]?.serviceType) ||
+    'General consultation'
+  )
+}
+
+function buildAppointmentNotificationMessage({ status, serviceType, scheduledFor, rejectionReason }) {
+  const formattedStatus = toTitleCaseLabel(status)
+  const formattedDateTime = formatDateTimeLabel(scheduledFor)
+
+  if (status === 'approved') {
+    return `${serviceType} appointment approved for ${formattedDateTime}.`
+  }
+
+  if (status === 'rescheduled') {
+    return `${serviceType} appointment rescheduled to ${formattedDateTime}.`
+  }
+
+  if (status === 'rejected') {
+    return rejectionReason
+      ? `${serviceType} appointment rejected. Reason: ${rejectionReason}`
+      : `${serviceType} appointment rejected by admin.`
+  }
+
+  if (status === 'completed') {
+    return `${serviceType} appointment marked as completed.`
+  }
+
+  if (status === 'cancelled') {
+    return `${serviceType} appointment cancelled by admin.`
+  }
+
+  return `${serviceType} appointment is now ${formattedStatus.toLowerCase()}.`
 }
 
 function buildEmptyFolderSummary(user) {
@@ -308,7 +429,7 @@ export const getAdminOverview = asyncHandler(async (_req, res) => {
       $or: [{ status: 'pending' }, { verificationStatus: 'pending' }],
     }),
     Appointment.countDocuments({
-      status: { $in: ['pending', 'scheduled', 'confirmed'] },
+      status: { $in: ['pending', 'approved', 'rescheduled', 'scheduled', 'confirmed'] },
     }),
     Appointment.countDocuments({ scheduledFor: { $gte: startOfDay, $lt: endOfDay } }),
     Payment.aggregate([
@@ -439,7 +560,7 @@ export const getAdminMessages = asyncHandler(async (_req, res) => {
       .populate('user', userFields)
       .sort({ createdAt: -1 }),
     Appointment.find({
-      $or: [{ notes: { $exists: true, $ne: '' } }, { status: { $in: ['pending', 'scheduled'] } }],
+      $or: [{ notes: { $exists: true, $ne: '' } }, { status: { $in: ['pending', 'scheduled', 'rescheduled'] } }],
     })
       .populate('user', userFields)
       .sort({ createdAt: -1 }),
@@ -504,7 +625,7 @@ export const getAdminMessages = asyncHandler(async (_req, res) => {
         safeTrim(appointment.notes) || `Requested consultation for ${formatDateTimeLabel(appointment.scheduledFor)}.`,
       createdAt: appointment.createdAt,
       status: appointment.status,
-      needsAction: ['pending', 'scheduled'].includes(appointment.status),
+      needsAction: ['pending', 'scheduled', 'rescheduled'].includes(appointment.status),
       meta: {
         scheduledFor: appointment.scheduledFor,
       },
@@ -654,7 +775,12 @@ export const getUserDetails = asyncHandler(async (req, res) => {
       documents: documents.map((document) => serializeDocument(document, 'admin')),
       services,
       payments,
-      appointments,
+      appointments: appointments.map((appointment) => ({
+        ...appointment.toObject(),
+        status: normalizeAppointmentStatus(appointment.status),
+        serviceType: appointment.serviceType || 'General consultation',
+        statusLabel: toTitleCaseLabel(normalizeAppointmentStatus(appointment.status)),
+      })),
       notifications,
     },
   })
@@ -1134,14 +1260,20 @@ export const updateService = asyncHandler(async (req, res) => {
 export const createAdminAppointment = asyncHandler(async (req, res) => {
   const userId = safeTrim(req.body.userId)
   const scheduledFor = req.body.scheduledFor
+  const serviceType = safeTrim(req.body.serviceType, 'General consultation')
   const notes = safeTrim(req.body.notes)
   const adminNotes = safeTrim(req.body.adminNotes)
-  const requestedStatus = safeTrim(req.body.status, 'confirmed')
-  const status = ['pending', 'scheduled', 'confirmed'].includes(requestedStatus) ? requestedStatus : 'confirmed'
+  const status = normalizeAppointmentStatus(req.body.status, 'approved')
+  const rejectionReason = safeTrim(req.body.rejectionReason)
 
   if (!userId || !scheduledFor) {
     res.status(400)
     throw new Error('User, date, and time are required')
+  }
+
+  if (status === 'rejected' && !rejectionReason) {
+    res.status(400)
+    throw new Error('A rejection reason is required')
   }
 
   const user = await User.findById(userId).select('name role')
@@ -1154,15 +1286,22 @@ export const createAdminAppointment = asyncHandler(async (req, res) => {
   const appointment = await Appointment.create({
     user: userId,
     scheduledFor: new Date(scheduledFor),
+    serviceType,
     notes,
     adminNotes,
     status,
+    rejectionReason,
   })
 
   await createNotification({
     userId,
     title: 'Appointment booked by admin',
-    message: `Your consultation has been ${status} for ${formatDateTimeLabel(scheduledFor)}.`,
+    message: buildAppointmentNotificationMessage({
+      status,
+      serviceType,
+      scheduledFor,
+      rejectionReason,
+    }),
     category: 'appointment',
     link: '/dashboard/appointments',
     actionLabel: 'Open appointments',
@@ -1175,16 +1314,91 @@ export const createAdminAppointment = asyncHandler(async (req, res) => {
 })
 
 export const getAllAppointments = asyncHandler(async (_req, res) => {
-  const appointments = await Appointment.find().populate('user', 'name email phone').sort({ scheduledFor: -1 })
+  const appointments = await Appointment.find().populate('user', 'name email phone').sort({ scheduledFor: -1, createdAt: -1 })
 
-  const summary = {
-    total: appointments.length,
-    pending: appointments.filter((appointment) => ['pending', 'scheduled', 'confirmed'].includes(appointment.status))
-      .length,
-    completed: appointments.filter((appointment) => appointment.status === 'completed').length,
+  const userIds = Array.from(
+    new Set(
+      appointments
+        .map((appointment) => appointment.user?._id?.toString())
+        .filter(Boolean),
+    ),
+  )
+
+  const [documents, payments, services] = await Promise.all([
+    Document.find({ user: { $in: userIds } }).select('user serviceType status createdAt').sort({ createdAt: -1 }),
+    Payment.find({ user: { $in: userIds } })
+      .select('user serviceType status verificationStatus createdAt paidAt verifiedAt')
+      .sort({ createdAt: -1 }),
+    Service.find({ user: { $in: userIds } }).select('user type status updatedAt createdAt').sort({ updatedAt: -1, createdAt: -1 }),
+  ])
+
+  const documentsByUser = new Map()
+  const paymentsByUser = new Map()
+  const servicesByUser = new Map()
+
+  for (const document of documents) {
+    const key = document.user?.toString()
+
+    if (!key) continue
+    if (!documentsByUser.has(key)) documentsByUser.set(key, [])
+    documentsByUser.get(key).push(document)
   }
 
-  res.json({ appointments, summary })
+  for (const payment of payments) {
+    const key = payment.user?.toString()
+
+    if (!key) continue
+    if (!paymentsByUser.has(key)) paymentsByUser.set(key, [])
+    paymentsByUser.get(key).push(payment)
+  }
+
+  for (const service of services) {
+    const key = service.user?.toString()
+
+    if (!key) continue
+    if (!servicesByUser.has(key)) servicesByUser.set(key, [])
+    servicesByUser.get(key).push(service)
+  }
+
+  const enrichedAppointments = appointments.map((appointment) => {
+    const appointmentObject = appointment.toObject()
+    const userKey = appointment.user?._id?.toString() || ''
+    const relatedDocuments = documentsByUser.get(userKey) || []
+    const relatedPayments = paymentsByUser.get(userKey) || []
+    const relatedServices = servicesByUser.get(userKey) || []
+    const status = normalizeAppointmentStatus(appointmentObject.status)
+    const selectedService = deriveAppointmentServiceType(
+      appointmentObject,
+      relatedServices,
+      relatedDocuments,
+      relatedPayments,
+    )
+    const relevantDocument = pickLatestRecordByService(relatedDocuments, selectedService, 'serviceType')
+    const relevantPayment = pickLatestRecordByService(relatedPayments, selectedService, 'serviceType')
+
+    return {
+      ...appointmentObject,
+      status,
+      statusLabel: toTitleCaseLabel(status),
+      serviceType: appointmentObject.serviceType || selectedService,
+      selectedService,
+      message: appointmentObject.notes || '',
+      documentStatus: normalizeDocumentStatusForAdmin(relevantDocument?.status),
+      paymentStatus: normalizePaymentStatusForAdmin(relevantPayment),
+    }
+  })
+
+  const summary = {
+    total: enrichedAppointments.length,
+    pending: enrichedAppointments.filter((appointment) => appointment.status === 'pending').length,
+    approved: enrichedAppointments.filter((appointment) => appointment.status === 'approved').length,
+    rescheduled: enrichedAppointments.filter((appointment) => appointment.status === 'rescheduled').length,
+    rejected: enrichedAppointments.filter((appointment) => appointment.status === 'rejected').length,
+    completed: enrichedAppointments.filter((appointment) => appointment.status === 'completed').length,
+    cancelled: enrichedAppointments.filter((appointment) => appointment.status === 'cancelled').length,
+  }
+
+  res.json({ appointments: enrichedAppointments, summary })
 })
 
 export const updateAppointment = asyncHandler(async (req, res) => {
@@ -1199,20 +1413,53 @@ export const updateAppointment = asyncHandler(async (req, res) => {
     appointment.scheduledFor = new Date(req.body.scheduledFor)
   }
 
-  appointment.status = safeTrim(req.body.status, appointment.status) || appointment.status
+  const nextStatus = normalizeAppointmentStatus(req.body.status, appointment.status)
+  const nextRejectionReason =
+    req.body.rejectionReason !== undefined
+      ? safeTrim(req.body.rejectionReason)
+      : safeTrim(appointment.rejectionReason)
+
+  if (nextStatus === 'rejected' && !nextRejectionReason) {
+    res.status(400)
+    throw new Error('A rejection reason is required')
+  }
+
+  if (nextStatus === 'rescheduled' && !req.body.scheduledFor && normalizeAppointmentStatus(appointment.status) !== 'rescheduled') {
+    res.status(400)
+    throw new Error('A new appointment date and time are required to reschedule')
+  }
+
+  appointment.status = nextStatus
+  if (req.body.serviceType !== undefined) {
+    appointment.serviceType = safeTrim(req.body.serviceType, appointment.serviceType || 'General consultation')
+  }
   appointment.adminNotes = safeTrim(req.body.adminNotes, appointment.adminNotes)
+  appointment.rejectionReason = nextStatus === 'rejected' ? nextRejectionReason : ''
   await appointment.save()
 
   await createNotification({
     userId: appointment.user,
     title: 'Appointment updated',
-    message: `Your consultation request is now ${appointment.status}.`,
+    message: buildAppointmentNotificationMessage({
+      status: appointment.status,
+      serviceType: appointment.serviceType || 'General consultation',
+      scheduledFor: appointment.scheduledFor,
+      rejectionReason: appointment.rejectionReason,
+    }),
     category: 'appointment',
     link: '/dashboard/appointments',
     actionLabel: 'Open appointments',
   })
 
-  res.json({ message: 'Appointment updated successfully', appointment })
+  res.json({
+    message: 'Appointment updated successfully',
+    appointment: {
+      ...appointment.toObject(),
+      status: normalizeAppointmentStatus(appointment.status),
+      serviceType: appointment.serviceType || 'General consultation',
+      statusLabel: toTitleCaseLabel(normalizeAppointmentStatus(appointment.status)),
+    },
+  })
 })
 
 export const getAllPayments = asyncHandler(async (_req, res) => {

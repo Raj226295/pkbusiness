@@ -90,22 +90,21 @@ function Services() {
     return catalog.map((service) => {
       const guide = getServiceSelectionByDocumentType(service.name)
       const imageIndex = guide ? Math.max(guide.documentTypes.indexOf(service.name), 0) : -1
+      const guideImage = guide ? guide.cardImages[imageIndex] || guide.cardImages[0] : null
 
       return {
         ...service,
         guide,
         cardImageUrl: service.image
           ? resolveUploadUrl(service.image)
-          : guide
-            ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.src || ''
-            : '',
-        cardImageAlt: guide ? (guide.cardImages[imageIndex] || guide.cardImages[0])?.alt || `${service.name} poster` : `${service.name} poster`,
+          : guideImage?.src || '',
+        cardImageAlt: guideImage?.alt || `${service.name} poster`,
         cardImageStyle: service.image
           ? {
               objectPosition: `${50 + Number(service.imageOffsetX || 0)}% ${50 + Number(service.imageOffsetY || 0)}%`,
               transform: `scale(${Number(service.imageZoom || 1)})`,
             }
-          : undefined,
+          : guideImage?.style,
       }
     })
   }, [catalog])
@@ -146,12 +145,11 @@ function Services() {
       })
   }, [])
 
-  const handleOpenUploadDocuments = (serviceName) => {
+  const buildUploadDocumentsUrl = (serviceName) => {
     const guide = getServiceSelectionByDocumentType(serviceName)
 
     if (!guide) {
-      navigate('/dashboard/upload-documents')
-      return
+      return '/dashboard/upload-documents'
     }
 
     const query = new URLSearchParams({
@@ -159,7 +157,15 @@ function Services() {
       documentType: serviceName,
     })
 
-    navigate(`/dashboard/upload-documents?${query.toString()}`)
+    return `/dashboard/upload-documents?${query.toString()}`
+  }
+
+  const handleOpenUploadDocuments = (serviceName) => {
+    navigate(buildUploadDocumentsUrl(serviceName))
+  }
+
+  const handleOpenUploadDocumentsInNewPage = (serviceName) => {
+    window.open(buildUploadDocumentsUrl(serviceName), '_blank', 'noopener,noreferrer')
   }
 
   const handleProceedToPayment = (service) => {
@@ -199,7 +205,7 @@ function Services() {
               <button
                 className="service-selection-card"
                 key={service._id}
-                onClick={() => handleOpenUploadDocuments(service.name)}
+                onClick={() => handleOpenUploadDocumentsInNewPage(service.name)}
                 type="button"
               >
                 {service.cardImageUrl ? (
@@ -208,9 +214,11 @@ function Services() {
                   </div>
                 ) : null}
                 <div className="service-card-body">
-                  <strong>{service.name}</strong>
+                  <div className="service-card-topline">
+                    <strong>{service.name}</strong>
+                    <span className="status-badge neutral service-card-price">{formatCurrency(service.price || 0)}</span>
+                  </div>
                   <p>{service.description || service.guide?.summary || 'Professional support for this service.'}</p>
-                  <span className="status-badge neutral service-card-price">Final price after review</span>
                   <span className="service-card-link">Upload documents</span>
                 </div>
               </button>

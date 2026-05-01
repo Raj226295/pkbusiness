@@ -41,7 +41,7 @@ function Contact() {
     <div className="page-stack container">
       <section className="page-hero">
         <span className="eyebrow">Contact Us</span>
-        <h1>Let’s discuss your compliance, tax, or finance requirement.</h1>
+        <h1>Let&apos;s discuss your compliance, tax, or finance requirement.</h1>
         <p>Send your details, or use the WhatsApp button for a quick consultation request.</p>
       </section>
 

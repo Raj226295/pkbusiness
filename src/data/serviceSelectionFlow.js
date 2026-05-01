@@ -1,9 +1,9 @@
-import accountingBookkeepingImage from '../assets/services/accounting-bookkeeping-card.jpg'
-import auditServicesImage from '../assets/services/audit-services-card.jpg'
+import accountingBookkeepingImage from '../assets/services/accounting-bookkeeping-custom.webp'
+import auditServicesImage from '../assets/services/audit-services-custom.jpg'
 import companyRegistrationImage from '../assets/services/company-registration-card.jpg'
-import foodLicenseImage from '../assets/services/food-license-card.jpg'
-import gstRegistrationReturnImage from '../assets/services/gst-registration-return-card.jpg'
-import incomeTaxFilingImage from '../assets/services/income-tax-filing-card.jpg'
+import foodLicenseImage from '../assets/services/food-license-custom.jpg'
+import gstRegistrationReturnImage from '../assets/services/gst-registration-return-new.jpg'
+import incomeTaxFilingImage from '../assets/services/income-tax-filing-custom.jpg'
 
 export const serviceSelectionFlow = [
   {
@@ -135,6 +135,10 @@ export const serviceSelectionFlow = [
       {
         src: foodLicenseImage,
         alt: 'Food license service poster',
+        style: {
+          objectPosition: 'center top',
+          transform: 'scale(1.16)',
+        },
       },
     ],
     defaultDocumentType: 'Company Registration',

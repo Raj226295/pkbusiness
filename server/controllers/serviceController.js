@@ -3,13 +3,22 @@ import Service from '../models/Service.js'
 import ServiceCatalog from '../models/ServiceCatalog.js'
 import { createNotification } from '../utils/createNotification.js'
 
+async function loadActiveServiceCatalog() {
+  return ServiceCatalog.find({ isActive: true }).sort({ name: 1 })
+}
+
 export const getUserServices = asyncHandler(async (req, res) => {
   const services = await Service.find({ user: req.user._id }).populate('catalogService').sort({ updatedAt: -1 })
   res.json({ services })
 })
 
 export const getServiceCatalogForUsers = asyncHandler(async (_req, res) => {
-  const services = await ServiceCatalog.find({ isActive: true }).sort({ name: 1 })
+  const services = await loadActiveServiceCatalog()
+  res.json({ services })
+})
+
+export const getPublicServiceCatalog = asyncHandler(async (_req, res) => {
+  const services = await loadActiveServiceCatalog()
   res.json({ services })
 })
 

@@ -5,9 +5,14 @@ import EmptyState from '../../components/common/EmptyState.jsx'
 import Loader from '../../components/common/Loader.jsx'
 import api, { extractApiError } from '../../lib/api.js'
 import { formatDateTime } from '../../lib/formatters.js'
+import { serviceCatalog } from '../../data/siteData.js'
+
+const serviceOptions = ['General consultation', ...serviceCatalog.map((service) => service.title)]
+const activeAppointmentStatuses = ['pending', 'approved', 'rescheduled', 'confirmed', 'scheduled']
 
 const initialForm = {
   scheduledFor: '',
+  serviceType: serviceOptions[0],
   notes: '',
 }
 
@@ -21,16 +26,14 @@ function Appointments() {
   const summary = useMemo(() => {
     return {
       total: appointments.length,
-      active: appointments.filter((appointment) =>
-        ['pending', 'confirmed', 'scheduled'].includes(appointment.status),
-      ).length,
+      active: appointments.filter((appointment) => activeAppointmentStatuses.includes(appointment.status)).length,
       completed: appointments.filter((appointment) => appointment.status === 'completed').length,
     }
   }, [appointments])
 
   const loadAppointments = async () => {
     const { data } = await api.get('/api/appointments')
-    setAppointments(data.appointments)
+    setAppointments(data.appointments || [])
   }
 
   useEffect(() => {
@@ -74,7 +77,7 @@ function Appointments() {
   return (
     <div className="page-stack">
       <PageHeader
-        description="Request a consultation, track approval status, and see admin scheduling notes once the meeting is reviewed."
+        description="Request a consultation, select the service you need help with, and track approval, reschedule, or completion updates."
         eyebrow="Appointments"
         title="Consultation Booking"
       />
@@ -82,6 +85,16 @@ function Appointments() {
       <section className="card-grid two-up">
         <form className="panel form-panel" onSubmit={handleSubmit}>
           <h3>Book a consultation</h3>
+          <label>
+            Selected service
+            <select name="serviceType" onChange={handleChange} value={form.serviceType}>
+              {serviceOptions.map((service) => (
+                <option key={service} value={service}>
+                  {service}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Preferred date & time
             <input
@@ -94,7 +107,7 @@ function Appointments() {
             />
           </label>
           <label>
-            Notes
+            Message
             <textarea
               name="notes"
               onChange={handleChange}
@@ -128,8 +141,8 @@ function Appointments() {
             </div>
           </div>
           <ul className="bullet-list">
-            <li>New bookings first go to admin for confirmation.</li>
-            <li>Once reviewed, updated status and admin notes will appear in your history below.</li>
+            <li>New bookings first go to admin for review and approval.</li>
+            <li>Reschedule, rejection reason, and admin notes will appear in your appointment history.</li>
           </ul>
         </article>
       </section>
@@ -142,6 +155,8 @@ function Appointments() {
                 <div>
                   <strong>{formatDateTime(appointment.scheduledFor)}</strong>
                   <p>{appointment.notes || 'General consultation request'}</p>
+                  <small>Service: {appointment.serviceType || 'General consultation'}</small>
+                  {appointment.rejectionReason ? <small>Rejection reason: {appointment.rejectionReason}</small> : null}
                   {appointment.adminNotes ? <small>Admin notes: {appointment.adminNotes}</small> : null}
                 </div>
                 <StatusBadge status={appointment.status} />

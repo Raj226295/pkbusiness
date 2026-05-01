@@ -29,26 +29,43 @@ export const publicNavLinks = [
 
 export const serviceCatalog = [
   {
+    serviceSelectionId: 'income-tax-filing',
+    documentType: 'Income Tax Filing',
     title: 'Income Tax Filing',
     summary: 'Salaried, business, and capital gains returns with accurate planning support.',
     deliverables: ['ITR preparation', 'Tax-saving review', 'Notice support'],
   },
   {
+    serviceSelectionId: 'gst-registration-return',
+    documentType: 'GST Registration & Return',
     title: 'GST Registration & Return',
     summary: 'Registration, monthly or quarterly filing, and reconciliations for growing teams.',
     deliverables: ['GST registration', 'Return filing', 'Input credit reconciliation'],
   },
   {
+    serviceSelectionId: 'audit-services',
+    documentType: 'Audit Services',
     title: 'Audit Services',
     summary: 'Statutory, tax, and internal audits with a practical compliance checklist.',
     deliverables: ['Audit planning', 'Ledger review', 'Compliance reporting'],
   },
   {
+    serviceSelectionId: 'company-registration-food-license',
+    documentType: 'Company Registration',
     title: 'Company Registration',
     summary: 'Private limited, LLP, and startup registrations with documentation support.',
     deliverables: ['Entity selection', 'MCA filing', 'Post-incorporation guidance'],
   },
   {
+    serviceSelectionId: 'company-registration-food-license',
+    documentType: 'Food License',
+    title: 'Food License',
+    summary: 'Food business registration support with filing guidance and compliance help.',
+    deliverables: ['License application', 'Document review', 'Compliance guidance'],
+  },
+  {
+    serviceSelectionId: 'accounting-bookkeeping',
+    documentType: 'Accounting / Bookkeeping',
     title: 'Accounting / Bookkeeping',
     summary: 'Monthly bookkeeping, MIS reporting, payroll support, and closure assistance.',
     deliverables: ['Book closure', 'Ledger maintenance', 'Monthly management reports'],

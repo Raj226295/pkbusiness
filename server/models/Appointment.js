@@ -11,6 +11,11 @@ const appointmentSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    serviceType: {
+      type: String,
+      default: 'General consultation',
+      trim: true,
+    },
     notes: {
       type: String,
       default: '',
@@ -19,9 +24,14 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    rejectionReason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     status: {
       type: String,
-      enum: ['pending', 'scheduled', 'confirmed', 'completed', 'cancelled', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'rescheduled', 'completed', 'cancelled'],
       default: 'pending',
     },
   },
